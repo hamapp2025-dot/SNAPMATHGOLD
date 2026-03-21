@@ -215,13 +215,35 @@ function normalizeVisionSteps(rawSteps, locale) {
   if (!Array.isArray(rawSteps)) return [];
 
   return rawSteps
-    .filter((item) => item && typeof item === 'object')
-    .map((item, index) => ({
-      label:
-        readString(item.label) ||
-        (locale === 'ar' ? `الخطوة ${index + 1}` : `Step ${index + 1}`),
-      body: readString(item.body).slice(0, 3000),
-    }))
+    .map((item, index) => {
+      if (typeof item === 'string') {
+        const trimmed = item.trim();
+        if (!trimmed) return null;
+
+        const colonIdx = trimmed.indexOf(':');
+        if (colonIdx > 0 && colonIdx < 60) {
+          return {
+            label: trimmed.slice(0, colonIdx).trim(),
+            body: trimmed.slice(colonIdx + 1).trim().slice(0, 3000),
+          };
+        }
+
+        return {
+          label: locale === 'ar' ? `الخطوة ${index + 1}` : `Step ${index + 1}`,
+          body: trimmed.slice(0, 3000),
+        };
+      }
+
+      if (!item || typeof item !== 'object') return null;
+
+      return {
+        label:
+          readString(item.label) ||
+          (locale === 'ar' ? `الخطوة ${index + 1}` : `Step ${index + 1}`),
+        body: readString(item.body).slice(0, 3000),
+      };
+    })
+    .filter(Boolean)
     .filter((item) => item.label.length > 0 || item.body.length > 0);
 }
 
@@ -238,9 +260,12 @@ function parseVisionResponse(data) {
       return null;
     }
 
+    const question = readString(parsed.question, readString(parsed.questionAr, 'Scanned Problem'));
+    const questionAr = readString(parsed.questionAr, question || 'المسألة الممسوحة');
+
     return {
-      question: readString(parsed.question, 'Scanned Problem'),
-      questionAr: readString(parsed.questionAr, 'المسألة الممسوحة'),
+      question: question || 'Scanned Problem',
+      questionAr: questionAr || 'المسألة الممسوحة',
       steps: steps.length > 0 ? steps : stepsAr,
       stepsAr: stepsAr.length > 0 ? stepsAr : steps,
     };
