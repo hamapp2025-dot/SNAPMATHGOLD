@@ -1,0 +1,35 @@
+services:
+  - type: web
+    name: snapmath-ai-proxy
+    runtime: node
+    rootDir: services/ai-proxy
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_VERSION
+        value: 20
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: FIREBASE_SERVICE_ACCOUNT_JSON
+        sync: false
+      - key: FIREBASE_PROJECT_ID
+        sync: false
+      - key: FIREBASE_CLIENT_EMAIL
+        sync: false
+      - key: FIREBASE_PRIVATE_KEY
+        sync: false
+      - key: OPENAI_CHAT_MODEL
+        value: gpt-4o-mini
+      - key: OPENAI_VISION_MODEL
+        value: gpt-4o-mini
+      - key: AI_CHAT_MAX_TOKENS
+        value: "500"
+      - key: AI_VISION_MAX_TOKENS
+        value: "800"
+      - key: AI_RATE_LIMIT_WINDOW_MS
+        value: "60000"
+      - key: AI_RATE_LIMIT_MAX_REQUESTS
+        value: "12"
+      - key: ALLOW_ANONYMOUS_AI
+        value: "false"

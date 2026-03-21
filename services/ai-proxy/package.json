@@ -1,0 +1,22 @@
+{
+  "name": "ai-proxy",
+  "version": "1.0.0",
+  "description": "Managed AI proxy for SnapMath Academy mobile app",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "check": "node --check index.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "private": true,
+  "type": "commonjs",
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "express": "^5.2.1",
+    "firebase-admin": "^13.7.0"
+  }
+}
