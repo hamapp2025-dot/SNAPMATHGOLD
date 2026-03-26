@@ -509,10 +509,8 @@ const launchInterestHref = "#waitlist";
 const subscriptionInterestHref = "#waitlist";
 const socialHandle = "@snapmathacademy";
 const formSubmitEndpoint = "https://formsubmit.co/ajax/hello@snapmathacademy.com";
-const repoAssetBaseUrl =
-  "https://raw.githubusercontent.com/hamapp2025-dot/SNAPMATHGOLD/2026-03-18-0fde-dd9d8";
-const lessonDemoVideoUrl = `${repoAssetBaseUrl}/assets/media/lessons/u1-l1-hero-subtitled-voiced.mp4`;
-const lessonDemoPosterUrl = `${repoAssetBaseUrl}/build32-first-launch-intro.png`;
+const lessonDemoVideoUrl = "/demo-video.mp4";
+const lessonDemoPosterUrl = "/demo-poster.png";
 const emptyWaitlistForm: WaitlistFormState = {
   name: "",
   email: "",
