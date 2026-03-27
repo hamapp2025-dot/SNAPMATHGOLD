@@ -12,6 +12,20 @@ const RATE_LIMIT_MAX_REQUESTS = readNumberEnv('AI_RATE_LIMIT_MAX_REQUESTS', 12);
 const MAX_MESSAGES = readNumberEnv('AI_MAX_MESSAGES', 20);
 const MAX_IMAGE_BASE64_LENGTH = readNumberEnv('AI_MAX_IMAGE_BASE64_LENGTH', 6_000_000);
 const ALLOW_ANONYMOUS_AI = readBooleanEnv('ALLOW_ANONYMOUS_AI', false);
+const WAITLIST_ALLOWED_ROLES = new Set(['student', 'parent', 'teacher']);
+const WAITLIST_ALLOWED_INTERESTS = new Set([
+  'early-access',
+  'monthly-plan',
+  'semester-plan',
+  'annual-plan',
+]);
+const WAITLIST_ALLOWED_ORIGINS = new Set([
+  'https://snapmathacademy.com',
+  'https://www.snapmathacademy.com',
+  'https://snapmath-academy-landing.onrender.com',
+  'http://localhost:3000',
+  'http://127.0.0.1:3000',
+]);
 
 const rateLimitBuckets = new Map();
 const app = express();
@@ -39,6 +53,14 @@ function readString(value, fallback = '') {
   return typeof value === 'string' && value.trim().length > 0 ? value.trim() : fallback;
 }
 
+function normalizeSingleLine(value, maxLength = 200) {
+  return readString(value).replace(/\s+/g, ' ').trim().slice(0, maxLength);
+}
+
+function normalizeLongText(value, maxLength = 1200) {
+  return readString(value).replace(/\r\n/g, '\n').trim().slice(0, maxLength);
+}
+
 function readNumberEnv(name, fallback) {
   const value = Number(process.env[name]);
   return Number.isFinite(value) && value > 0 ? value : fallback;
@@ -53,6 +75,14 @@ function readBooleanEnv(name, fallback) {
 
 function normalizePrivateKey(value) {
   return readString(value).replace(/\\n/g, '\n');
+}
+
+function isValidEmail(value) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+}
+
+function buildWaitlistDocumentId(email) {
+  return Buffer.from(email, 'utf8').toString('base64url');
 }
 
 function readFirebaseServiceAccount() {
@@ -94,7 +124,6 @@ function readFirebaseServiceAccount() {
 }
 
 function ensureFirebaseApp() {
-  if (ALLOW_ANONYMOUS_AI) return true;
   if (admin.apps.length > 0) return true;
 
   try {
@@ -121,6 +150,121 @@ function ensureFirebaseApp() {
 
 function getRequesterId(req) {
   return req.aiUser?.uid || req.ip || 'unknown';
+}
+
+function setWaitlistCorsHeaders(req, res) {
+  const origin = readString(req.headers.origin);
+  const allowedOrigin = WAITLIST_ALLOWED_ORIGINS.has(origin) ? origin : '';
+
+  res.set('Vary', 'Origin');
+  res.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.set('Access-Control-Allow-Headers', 'Content-Type, Accept');
+  res.set('Access-Control-Max-Age', '86400');
+
+  if (allowedOrigin) {
+    res.set('Access-Control-Allow-Origin', allowedOrigin);
+  }
+
+  return { origin, allowedOrigin };
+}
+
+function parseWaitlistSubmission(body) {
+  const name = normalizeSingleLine(body?.name, 120);
+  const email = normalizeSingleLine(body?.email, 160).toLowerCase();
+  const phone = normalizeSingleLine(body?.phone, 60);
+  const role = normalizeSingleLine(body?.role, 40).toLowerCase();
+  const interest = normalizeSingleLine(body?.interest, 40).toLowerCase();
+  const notes = normalizeLongText(body?.notes, 1200);
+  const locale = normalizeSingleLine(body?.locale, 8).toLowerCase() === 'ar' ? 'ar' : 'en';
+  const website = normalizeSingleLine(body?.website, 120);
+
+  if (website) {
+    return { ok: true, honeypot: true };
+  }
+
+  if (name.length < 2) {
+    return { ok: false, status: 400, error: 'invalid_name' };
+  }
+
+  if (!isValidEmail(email)) {
+    return { ok: false, status: 400, error: 'invalid_email' };
+  }
+
+  if (!WAITLIST_ALLOWED_ROLES.has(role)) {
+    return { ok: false, status: 400, error: 'invalid_role' };
+  }
+
+  if (!WAITLIST_ALLOWED_INTERESTS.has(interest)) {
+    return { ok: false, status: 400, error: 'invalid_interest' };
+  }
+
+  return {
+    ok: true,
+    data: {
+      name,
+      email,
+      phone,
+      role,
+      interest,
+      notes,
+      locale,
+    },
+  };
+}
+
+async function storeWaitlistLead(req, submission) {
+  const db = admin.firestore();
+  const submittedAt = admin.firestore.FieldValue.serverTimestamp();
+  const emailLower = submission.email;
+  const contactId = buildWaitlistDocumentId(emailLower);
+  const userAgent = normalizeSingleLine(req.headers['user-agent'], 300) || null;
+  const sourceOrigin = readString(req.headers.origin) || null;
+  const contactsRef = db.collection('landing_waitlist_contacts').doc(contactId);
+  const eventsRef = db.collection('landing_waitlist_events').doc();
+  const existingContact = await contactsRef.get();
+
+  const contactPayload = {
+    email: emailLower,
+    emailLower,
+    name: submission.name,
+    phone: submission.phone || null,
+    role: submission.role,
+    interest: submission.interest,
+    notes: submission.notes || '',
+    locale: submission.locale,
+    source: 'landing-page',
+    sourceOrigin,
+    lastIp: req.ip || null,
+    lastUserAgent: userAgent,
+    lastSubmittedAt: submittedAt,
+    submissionCount: admin.firestore.FieldValue.increment(1),
+    status: existingContact.exists ? readString(existingContact.get('status'), 'new') : 'new',
+  };
+
+  if (!existingContact.exists) {
+    contactPayload.firstSubmittedAt = submittedAt;
+  }
+
+  const batch = db.batch();
+  batch.set(contactsRef, contactPayload, { merge: true });
+  batch.set(eventsRef, {
+    contactId,
+    email: emailLower,
+    name: submission.name,
+    phone: submission.phone || null,
+    role: submission.role,
+    interest: submission.interest,
+    notes: submission.notes || '',
+    locale: submission.locale,
+    source: 'landing-page',
+    sourceOrigin,
+    ip: req.ip || null,
+    userAgent,
+    submittedAt,
+  });
+  await batch.commit();
+
+  return { duplicate: existingContact.exists };
 }
 
 async function authenticateRequest(req, res, next) {
@@ -327,15 +471,59 @@ async function callOpenAI(payload) {
 }
 
 app.get('/health', (_req, res) => {
+  const firebaseReady = ensureFirebaseApp();
+
   res.json({
     ok: true,
     service: 'snapmath-ai-proxy',
     hasOpenAiKey: !!OPENAI_API_KEY,
     allowAnonymousAi: ALLOW_ANONYMOUS_AI,
-    firebaseAuthReady: ALLOW_ANONYMOUS_AI || ensureFirebaseApp(),
+    firebaseAuthReady: ALLOW_ANONYMOUS_AI || firebaseReady,
+    waitlistReady: firebaseReady,
     chatModel: OPENAI_CHAT_MODEL,
     visionModel: OPENAI_VISION_MODEL,
   });
+});
+
+app.options('/waitlist', (req, res) => {
+  const { origin, allowedOrigin } = setWaitlistCorsHeaders(req, res);
+
+  if (origin && !allowedOrigin) {
+    return res.status(403).json({ error: 'origin_not_allowed' });
+  }
+
+  return res.status(204).end();
+});
+
+app.post('/waitlist', applyRateLimit, async (req, res) => {
+  const { origin, allowedOrigin } = setWaitlistCorsHeaders(req, res);
+  res.set('Cache-Control', 'no-store');
+
+  if (origin && !allowedOrigin) {
+    return res.status(403).json({ error: 'origin_not_allowed' });
+  }
+
+  const parsed = parseWaitlistSubmission(req.body);
+  if (!parsed.ok) {
+    return res.status(parsed.status).json({ error: parsed.error });
+  }
+
+  if (parsed.honeypot) {
+    return res.json({ ok: true, duplicate: false });
+  }
+
+  if (!ensureFirebaseApp()) {
+    return res.status(500).json({ error: 'firebase_waitlist_not_configured' });
+  }
+
+  try {
+    const result = await storeWaitlistLead(req, parsed.data);
+    console.info(`[ai-proxy] waitlist stored for ${parsed.data.email}`);
+    return res.json({ ok: true, duplicate: result.duplicate });
+  } catch (error) {
+    console.error('[ai-proxy] Waitlist submit failed:', error);
+    return res.status(500).json({ error: 'waitlist_store_failed' });
+  }
 });
 
 app.post('/ai/chat', authenticateRequest, applyRateLimit, async (req, res) => {
