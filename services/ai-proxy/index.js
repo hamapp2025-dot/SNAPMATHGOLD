@@ -1,3 +1,4 @@
+const crypto = require('node:crypto');
 const express = require('express');
 const admin = require('firebase-admin');
 
@@ -26,6 +27,15 @@ const WAITLIST_ALLOWED_ORIGINS = new Set([
   'http://localhost:3000',
   'http://127.0.0.1:3000',
 ]);
+const WAITLIST_ADMIN_TOKEN = readString(process.env.WAITLIST_ADMIN_TOKEN);
+const WAITLIST_EMAIL_PROVIDER = readString(process.env.WAITLIST_EMAIL_PROVIDER, 'resend').toLowerCase();
+const WAITLIST_RESEND_API_KEY = readString(process.env.WAITLIST_RESEND_API_KEY);
+const WAITLIST_CONFIRMATION_FROM_EMAIL = readString(process.env.WAITLIST_CONFIRMATION_FROM_EMAIL);
+const WAITLIST_CONFIRMATION_REPLY_TO = readString(process.env.WAITLIST_CONFIRMATION_REPLY_TO);
+const WAITLIST_CONFIRMATION_BASE_URL = readString(
+  process.env.WAITLIST_CONFIRMATION_BASE_URL,
+  'https://snapmathacademy.com',
+);
 
 const rateLimitBuckets = new Map();
 const app = express();
@@ -77,12 +87,38 @@ function normalizePrivateKey(value) {
   return readString(value).replace(/\\n/g, '\n');
 }
 
+function readQueryString(value, fallback = '') {
+  if (typeof value === 'string') return value.trim();
+  if (Array.isArray(value) && typeof value[0] === 'string') return value[0].trim();
+  return fallback;
+}
+
+function readBoundedInteger(value, fallback, min, max) {
+  const parsed = Number(readQueryString(value));
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.min(max, Math.max(min, Math.round(parsed)));
+}
+
 function isValidEmail(value) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 }
 
 function buildWaitlistDocumentId(email) {
   return Buffer.from(email, 'utf8').toString('base64url');
+}
+
+function safeTokenCompare(left, right) {
+  if (!left || !right) return false;
+
+  const leftBuffer = Buffer.from(left, 'utf8');
+  const rightBuffer = Buffer.from(right, 'utf8');
+  if (leftBuffer.length !== rightBuffer.length) return false;
+
+  try {
+    return crypto.timingSafeEqual(leftBuffer, rightBuffer);
+  } catch {
+    return false;
+  }
 }
 
 function readFirebaseServiceAccount() {
@@ -212,6 +248,355 @@ function parseWaitlistSubmission(body) {
   };
 }
 
+function escapeHtml(value) {
+  return readString(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function getWaitlistInterestLabel(interest, locale) {
+  const labels = {
+    'early-access': { en: 'Early access', ar: 'الوصول المبكر' },
+    'monthly-plan': { en: 'Monthly plan', ar: 'الاشتراك الشهري' },
+    'semester-plan': { en: 'Semester plan', ar: 'الاشتراك الفصلي' },
+    'annual-plan': { en: 'Annual plan', ar: 'الاشتراك السنوي' },
+  };
+
+  const label = labels[interest];
+  if (!label) return locale === 'ar' ? 'سناب ماث' : 'SnapMath';
+  return locale === 'ar' ? label.ar : label.en;
+}
+
+function getWaitlistRoleLabel(role, locale) {
+  const labels = {
+    student: { en: 'Student', ar: 'طالب / طالبة' },
+    parent: { en: 'Parent', ar: 'ولي أمر' },
+    teacher: { en: 'Teacher', ar: 'معلم / معلمة' },
+  };
+
+  const label = labels[role];
+  if (!label) return locale === 'ar' ? 'مهتم' : 'Interested visitor';
+  return locale === 'ar' ? label.ar : label.en;
+}
+
+function buildWaitlistConfirmationEmail(submission) {
+  const locale = submission.locale === 'ar' ? 'ar' : 'en';
+  const name = escapeHtml(submission.name || (locale === 'ar' ? 'صديق سناب ماث' : 'SnapMath learner'));
+  const interestLabel = escapeHtml(getWaitlistInterestLabel(submission.interest, locale));
+  const roleLabel = escapeHtml(getWaitlistRoleLabel(submission.role, locale));
+  const pricingUrl = `${WAITLIST_CONFIRMATION_BASE_URL}#pricing`;
+  const communityUrl = `${WAITLIST_CONFIRMATION_BASE_URL}#community`;
+
+  if (locale === 'ar') {
+    return {
+      subject: 'تم تسجيلك في قائمة انتظار سناب ماث',
+      html: `
+        <div style="background:#0a0a0a;padding:32px 20px;font-family:Arial,sans-serif;color:#f7f4e8;">
+          <div style="max-width:620px;margin:0 auto;border:1px solid rgba(191,160,68,0.28);border-radius:24px;background:#101010;padding:32px;">
+            <p style="margin:0 0 12px;color:#f5e7a6;font-size:12px;letter-spacing:0.24em;text-transform:uppercase;">SnapMath Academy</p>
+            <h1 style="margin:0 0 16px;font-size:28px;line-height:1.35;color:#ffffff;">أهلاً ${name}، تم تأكيد انضمامك إلى قائمة الانتظار.</h1>
+            <p style="margin:0 0 14px;font-size:16px;line-height:1.9;color:rgba(255,255,255,0.78);">
+              سجّلنا اهتمامك بـ <strong style="color:#f5e7a6;">${interestLabel}</strong> كـ <strong style="color:#f5e7a6;">${roleLabel}</strong>.
+            </p>
+            <p style="margin:0 0 24px;font-size:16px;line-height:1.9;color:rgba(255,255,255,0.72);">
+              سنرسل لك تحديثات الإطلاق، تفاصيل الباقات، وروابط الوصول الأولى بمجرد فتح الدفعة الأولى من سناب ماث.
+            </p>
+            <div style="margin:0 0 24px;padding:18px 20px;border-radius:18px;background:rgba(191,160,68,0.08);border:1px solid rgba(191,160,68,0.24);">
+              <p style="margin:0 0 8px;font-size:14px;color:#f5e7a6;">ما الذي سيصلك؟</p>
+              <p style="margin:0;font-size:15px;line-height:1.8;color:rgba(255,255,255,0.76);">موعد فتح الدفعة الأولى، ما الذي يتضمنه كل اشتراك، وروابط التجربة أو الوصول المبكر عندما تصبح جاهزة.</p>
+            </div>
+            <div style="display:flex;gap:12px;flex-wrap:wrap;margin:0 0 24px;">
+              <a href="${pricingUrl}" style="display:inline-block;padding:14px 20px;border-radius:999px;background:#bfa044;color:#000000;font-weight:700;text-decoration:none;">شاهد الباقات</a>
+              <a href="${communityUrl}" style="display:inline-block;padding:14px 20px;border-radius:999px;border:1px solid rgba(255,255,255,0.18);color:#ffffff;text-decoration:none;">تابع تحديثات الإطلاق</a>
+            </div>
+            <p style="margin:0;font-size:14px;line-height:1.8;color:rgba(255,255,255,0.5);">
+              إذا احتجت أي شيء، يمكنك الرد على هذا البريد أو مراسلتنا على ${escapeHtml(
+                WAITLIST_CONFIRMATION_REPLY_TO || 'hello@snapmathacademy.com',
+              )}.
+            </p>
+          </div>
+        </div>
+      `,
+      text:
+        `أهلاً ${submission.name}, تم تسجيلك في قائمة انتظار سناب ماث.\n\n` +
+        `سجلنا اهتمامك بـ ${getWaitlistInterestLabel(submission.interest, locale)} كـ ${getWaitlistRoleLabel(
+          submission.role,
+          locale,
+        )}.\n` +
+        `سنرسل لك تحديثات الإطلاق وتفاصيل الاشتراك وروابط الوصول الأولى عندما تصبح جاهزة.\n\n` +
+        `الباقات: ${pricingUrl}\n` +
+        `التحديثات: ${communityUrl}\n\n` +
+        `للتواصل: ${WAITLIST_CONFIRMATION_REPLY_TO || 'hello@snapmathacademy.com'}`,
+    };
+  }
+
+  return {
+    subject: "You're on the SnapMath waitlist",
+    html: `
+      <div style="background:#0a0a0a;padding:32px 20px;font-family:Arial,sans-serif;color:#f7f4e8;">
+        <div style="max-width:620px;margin:0 auto;border:1px solid rgba(191,160,68,0.28);border-radius:24px;background:#101010;padding:32px;">
+          <p style="margin:0 0 12px;color:#f5e7a6;font-size:12px;letter-spacing:0.24em;text-transform:uppercase;">SnapMath Academy</p>
+          <h1 style="margin:0 0 16px;font-size:28px;line-height:1.35;color:#ffffff;">Hi ${name}, your waitlist spot is confirmed.</h1>
+          <p style="margin:0 0 14px;font-size:16px;line-height:1.85;color:rgba(255,255,255,0.78);">
+            We saved your interest in <strong style="color:#f5e7a6;">${interestLabel}</strong> as a <strong style="color:#f5e7a6;">${roleLabel}</strong>.
+          </p>
+          <p style="margin:0 0 24px;font-size:16px;line-height:1.85;color:rgba(255,255,255,0.72);">
+            We’ll email you launch timing, plan details, and early-access links as soon as the first SnapMath cohort opens.
+          </p>
+          <div style="margin:0 0 24px;padding:18px 20px;border-radius:18px;background:rgba(191,160,68,0.08);border:1px solid rgba(191,160,68,0.24);">
+            <p style="margin:0 0 8px;font-size:14px;color:#f5e7a6;">What you can expect next</p>
+            <p style="margin:0;font-size:15px;line-height:1.8;color:rgba(255,255,255,0.76);">First-cohort timing, pricing and plan coverage, and the first access links when they are ready.</p>
+          </div>
+          <div style="display:flex;gap:12px;flex-wrap:wrap;margin:0 0 24px;">
+            <a href="${pricingUrl}" style="display:inline-block;padding:14px 20px;border-radius:999px;background:#bfa044;color:#000000;font-weight:700;text-decoration:none;">View plans</a>
+            <a href="${communityUrl}" style="display:inline-block;padding:14px 20px;border-radius:999px;border:1px solid rgba(255,255,255,0.18);color:#ffffff;text-decoration:none;">Follow launch updates</a>
+          </div>
+          <p style="margin:0;font-size:14px;line-height:1.8;color:rgba(255,255,255,0.5);">
+            Need anything sooner? Reply to this message or email ${escapeHtml(
+              WAITLIST_CONFIRMATION_REPLY_TO || 'hello@snapmathacademy.com',
+            )}.
+          </p>
+        </div>
+      </div>
+    `,
+    text:
+      `Hi ${submission.name}, your SnapMath waitlist spot is confirmed.\n\n` +
+      `We saved your interest in ${getWaitlistInterestLabel(submission.interest, locale)} as a ${getWaitlistRoleLabel(
+        submission.role,
+        locale,
+      )}.\n` +
+      `We’ll email you launch timing, plan details, and early-access links as soon as they’re ready.\n\n` +
+      `Plans: ${pricingUrl}\n` +
+      `Launch updates: ${communityUrl}\n\n` +
+      `Reply: ${WAITLIST_CONFIRMATION_REPLY_TO || 'hello@snapmathacademy.com'}`,
+  };
+}
+
+function getWaitlistEmailConfig() {
+  if (WAITLIST_EMAIL_PROVIDER !== 'resend') return null;
+  if (!WAITLIST_RESEND_API_KEY || !WAITLIST_CONFIRMATION_FROM_EMAIL) return null;
+
+  return {
+    provider: 'resend',
+    apiKey: WAITLIST_RESEND_API_KEY,
+    fromEmail: WAITLIST_CONFIRMATION_FROM_EMAIL,
+    replyTo: WAITLIST_CONFIRMATION_REPLY_TO || undefined,
+  };
+}
+
+function isWaitlistEmailReady() {
+  return !!getWaitlistEmailConfig();
+}
+
+async function sendWaitlistConfirmationEmail(submission) {
+  const emailConfig = getWaitlistEmailConfig();
+  if (!emailConfig) {
+    return { status: 'skipped', provider: WAITLIST_EMAIL_PROVIDER || null };
+  }
+
+  const email = buildWaitlistConfirmationEmail(submission);
+
+  const response = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${emailConfig.apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      from: emailConfig.fromEmail,
+      to: [submission.email],
+      reply_to: emailConfig.replyTo,
+      subject: email.subject,
+      html: email.html,
+      text: email.text,
+    }),
+  });
+
+  const rawText = await response.text();
+  let data = null;
+
+  try {
+    data = JSON.parse(rawText);
+  } catch {
+    data = null;
+  }
+
+  if (!response.ok) {
+    const message =
+      readString(data?.message) || readString(data?.error) || rawText.slice(0, 300) || 'email_send_failed';
+    throw new Error(message);
+  }
+
+  return {
+    status: 'sent',
+    provider: emailConfig.provider,
+    providerMessageId: readString(data?.id) || null,
+  };
+}
+
+async function recordWaitlistConfirmationResult(contactId, result) {
+  const payload = {
+    confirmationEmailStatus: result.status,
+    confirmationEmailProvider: result.provider || null,
+    lastConfirmationAttemptAt: admin.firestore.FieldValue.serverTimestamp(),
+  };
+
+  if (result.status === 'sent') {
+    payload.confirmationEmailSentAt = admin.firestore.FieldValue.serverTimestamp();
+    payload.confirmationEmailMessageId = result.providerMessageId || null;
+    payload.lastConfirmationError = admin.firestore.FieldValue.delete();
+  } else if (result.status === 'failed') {
+    payload.lastConfirmationError = readString(result.error, 'email_send_failed').slice(0, 300);
+  }
+
+  await admin.firestore().collection('landing_waitlist_contacts').doc(contactId).set(payload, { merge: true });
+}
+
+function timestampToISOString(value) {
+  if (!value) return null;
+  if (typeof value?.toDate === 'function') return value.toDate().toISOString();
+  if (value instanceof Date) return value.toISOString();
+  const raw = new Date(value);
+  return Number.isNaN(raw.getTime()) ? null : raw.toISOString();
+}
+
+function serializeWaitlistContact(doc) {
+  const data = doc.data() || {};
+
+  return {
+    id: doc.id,
+    email: readString(data.emailLower || data.email),
+    name: readString(data.name),
+    phone: readString(data.phone) || null,
+    role: readString(data.role) || null,
+    interest: readString(data.interest) || null,
+    locale: readString(data.locale) || null,
+    status: readString(data.status) || null,
+    source: readString(data.source) || null,
+    sourceOrigin: readString(data.sourceOrigin) || null,
+    notes: readString(data.notes),
+    submissionCount:
+      typeof data.submissionCount === 'number' && Number.isFinite(data.submissionCount)
+        ? data.submissionCount
+        : 0,
+    confirmationEmailStatus: readString(data.confirmationEmailStatus) || null,
+    confirmationEmailProvider: readString(data.confirmationEmailProvider) || null,
+    confirmationEmailMessageId: readString(data.confirmationEmailMessageId) || null,
+    confirmationEmailSentAt: timestampToISOString(data.confirmationEmailSentAt),
+    firstSubmittedAt: timestampToISOString(data.firstSubmittedAt),
+    lastSubmittedAt: timestampToISOString(data.lastSubmittedAt),
+    lastConfirmationAttemptAt: timestampToISOString(data.lastConfirmationAttemptAt),
+    lastConfirmationError: readString(data.lastConfirmationError) || null,
+    lastIp: readString(data.lastIp) || null,
+    lastUserAgent: readString(data.lastUserAgent) || null,
+  };
+}
+
+function matchesWaitlistFilters(contact, filters) {
+  if (filters.role && contact.role !== filters.role) return false;
+  if (filters.interest && contact.interest !== filters.interest) return false;
+  if (filters.status && contact.status !== filters.status) return false;
+
+  if (filters.search) {
+    const haystack = [contact.email, contact.name, contact.phone, contact.notes].join(' ').toLowerCase();
+    if (!haystack.includes(filters.search)) return false;
+  }
+
+  return true;
+}
+
+function csvEscape(value) {
+  const text = value == null ? '' : String(value);
+  if (!/[",\n]/.test(text)) return text;
+  return `"${text.replace(/"/g, '""')}"`;
+}
+
+function buildWaitlistCsv(contacts) {
+  const headers = [
+    'id',
+    'email',
+    'name',
+    'phone',
+    'role',
+    'interest',
+    'locale',
+    'status',
+    'source',
+    'sourceOrigin',
+    'submissionCount',
+    'confirmationEmailStatus',
+    'confirmationEmailProvider',
+    'confirmationEmailSentAt',
+    'firstSubmittedAt',
+    'lastSubmittedAt',
+    'lastConfirmationAttemptAt',
+    'lastConfirmationError',
+    'lastIp',
+    'lastUserAgent',
+    'notes',
+  ];
+
+  const lines = contacts.map((contact) => headers.map((header) => csvEscape(contact[header])).join(','));
+  return [headers.join(','), ...lines].join('\n');
+}
+
+function readWaitlistAdminToken(req) {
+  const authorization = readString(req.headers.authorization);
+  if (authorization.startsWith('Bearer ')) {
+    return authorization.slice('Bearer '.length).trim();
+  }
+
+  const headerToken = readString(req.headers['x-waitlist-admin-token']);
+  if (headerToken) return headerToken;
+
+  return readQueryString(req.query.token);
+}
+
+function authenticateWaitlistAdmin(req, res, next) {
+  if (!WAITLIST_ADMIN_TOKEN) {
+    return res.status(503).json({ error: 'waitlist_admin_not_configured' });
+  }
+
+  const providedToken = readWaitlistAdminToken(req);
+  if (!safeTokenCompare(providedToken, WAITLIST_ADMIN_TOKEN)) {
+    return res.status(401).json({ error: 'invalid_admin_token' });
+  }
+
+  return next();
+}
+
+async function loadWaitlistContactsForAdmin(req) {
+  const limit = readBoundedInteger(req.query.limit, 100, 1, 1000);
+  const fetchLimit = Math.min(Math.max(limit * 4, limit), 2000);
+  const filters = {
+    role: readQueryString(req.query.role).toLowerCase(),
+    interest: readQueryString(req.query.interest).toLowerCase(),
+    status: readQueryString(req.query.status).toLowerCase(),
+    search: readQueryString(req.query.search).toLowerCase(),
+  };
+  const snapshot = await admin
+    .firestore()
+    .collection('landing_waitlist_contacts')
+    .orderBy('lastSubmittedAt', 'desc')
+    .limit(fetchLimit)
+    .get();
+
+  const contacts = snapshot.docs.map(serializeWaitlistContact).filter((contact) => matchesWaitlistFilters(contact, filters));
+  return { contacts: contacts.slice(0, limit), filters, limit };
+}
+
+async function readWaitlistTotalCount() {
+  try {
+    const aggregate = await admin.firestore().collection('landing_waitlist_contacts').count().get();
+    return Number(aggregate.data().count || 0);
+  } catch {
+    return null;
+  }
+}
+
 async function storeWaitlistLead(req, submission) {
   const db = admin.firestore();
   const submittedAt = admin.firestore.FieldValue.serverTimestamp();
@@ -222,6 +607,7 @@ async function storeWaitlistLead(req, submission) {
   const contactsRef = db.collection('landing_waitlist_contacts').doc(contactId);
   const eventsRef = db.collection('landing_waitlist_events').doc();
   const existingContact = await contactsRef.get();
+  const existingData = existingContact.exists ? existingContact.data() || {} : {};
 
   const contactPayload = {
     email: emailLower,
@@ -264,7 +650,11 @@ async function storeWaitlistLead(req, submission) {
   });
   await batch.commit();
 
-  return { duplicate: existingContact.exists };
+  return {
+    duplicate: existingContact.exists,
+    contactId,
+    existingData,
+  };
 }
 
 async function authenticateRequest(req, res, next) {
@@ -480,6 +870,9 @@ app.get('/health', (_req, res) => {
     allowAnonymousAi: ALLOW_ANONYMOUS_AI,
     firebaseAuthReady: ALLOW_ANONYMOUS_AI || firebaseReady,
     waitlistReady: firebaseReady,
+    waitlistAdminReady: !!WAITLIST_ADMIN_TOKEN,
+    waitlistEmailReady: isWaitlistEmailReady(),
+    waitlistEmailProvider: isWaitlistEmailReady() ? WAITLIST_EMAIL_PROVIDER : null,
     chatModel: OPENAI_CHAT_MODEL,
     visionModel: OPENAI_VISION_MODEL,
   });
@@ -509,7 +902,7 @@ app.post('/waitlist', applyRateLimit, async (req, res) => {
   }
 
   if (parsed.honeypot) {
-    return res.json({ ok: true, duplicate: false });
+    return res.json({ ok: true, duplicate: false, confirmationEmail: 'skipped' });
   }
 
   if (!ensureFirebaseApp()) {
@@ -518,11 +911,104 @@ app.post('/waitlist', applyRateLimit, async (req, res) => {
 
   try {
     const result = await storeWaitlistLead(req, parsed.data);
+    const priorEmailStatus = readString(result.existingData?.confirmationEmailStatus);
+    let confirmationEmail = priorEmailStatus === 'sent' ? 'already-sent' : 'skipped';
+
+    if (confirmationEmail !== 'already-sent' && isWaitlistEmailReady()) {
+      try {
+        const emailResult = await sendWaitlistConfirmationEmail(parsed.data);
+        confirmationEmail = emailResult.status;
+        if (emailResult.status !== 'skipped') {
+          await recordWaitlistConfirmationResult(result.contactId, emailResult);
+        }
+      } catch (error) {
+        confirmationEmail = 'failed';
+        await recordWaitlistConfirmationResult(result.contactId, {
+          status: 'failed',
+          provider: WAITLIST_EMAIL_PROVIDER || null,
+          error: error instanceof Error ? error.message : 'email_send_failed',
+        });
+        console.error('[ai-proxy] Waitlist confirmation email failed:', error);
+      }
+    }
+
     console.info(`[ai-proxy] waitlist stored for ${parsed.data.email}`);
-    return res.json({ ok: true, duplicate: result.duplicate });
+    return res.json({ ok: true, duplicate: result.duplicate, confirmationEmail });
   } catch (error) {
     console.error('[ai-proxy] Waitlist submit failed:', error);
     return res.status(500).json({ error: 'waitlist_store_failed' });
+  }
+});
+
+app.get('/waitlist/admin', authenticateWaitlistAdmin, async (req, res) => {
+  if (!ensureFirebaseApp()) {
+    return res.status(500).json({ error: 'firebase_waitlist_not_configured' });
+  }
+
+  try {
+    const [{ contacts, filters, limit }, totalContacts] = await Promise.all([
+      loadWaitlistContactsForAdmin(req),
+      readWaitlistTotalCount(),
+    ]);
+    const counts = {
+      roles: {},
+      interests: {},
+      statuses: {},
+    };
+
+    for (const contact of contacts) {
+      const roleKey = contact.role || 'unknown';
+      const interestKey = contact.interest || 'unknown';
+      const statusKey = contact.status || 'unknown';
+      counts.roles[roleKey] = (counts.roles[roleKey] || 0) + 1;
+      counts.interests[interestKey] = (counts.interests[interestKey] || 0) + 1;
+      counts.statuses[statusKey] = (counts.statuses[statusKey] || 0) + 1;
+    }
+
+    return res.json({
+      ok: true,
+      totalContacts,
+      returnedContacts: contacts.length,
+      limit,
+      filters,
+      waitlistEmailReady: isWaitlistEmailReady(),
+      contacts,
+      counts,
+      exportFormats: ['json', 'csv'],
+    });
+  } catch (error) {
+    console.error('[ai-proxy] Waitlist admin read failed:', error);
+    return res.status(500).json({ error: 'waitlist_admin_read_failed' });
+  }
+});
+
+app.get('/waitlist/export', authenticateWaitlistAdmin, async (req, res) => {
+  if (!ensureFirebaseApp()) {
+    return res.status(500).json({ error: 'firebase_waitlist_not_configured' });
+  }
+
+  try {
+    const format = readQueryString(req.query.format, 'json').toLowerCase();
+    const { contacts, filters, limit } = await loadWaitlistContactsForAdmin(req);
+
+    if (format === 'csv') {
+      const stamp = new Date().toISOString().slice(0, 10);
+      res.set('Content-Type', 'text/csv; charset=utf-8');
+      res.set('Content-Disposition', `attachment; filename="snapmath-waitlist-${stamp}.csv"`);
+      return res.send(buildWaitlistCsv(contacts));
+    }
+
+    return res.json({
+      ok: true,
+      format: 'json',
+      returnedContacts: contacts.length,
+      limit,
+      filters,
+      contacts,
+    });
+  } catch (error) {
+    console.error('[ai-proxy] Waitlist export failed:', error);
+    return res.status(500).json({ error: 'waitlist_export_failed' });
   }
 });
 

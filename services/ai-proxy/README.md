@@ -6,6 +6,9 @@ Small Express service that turns `AI Chat` and `MathScan` into managed backend f
 
 - Exposes `POST /ai/chat`
 - Exposes `POST /ai/vision`
+- Exposes `POST /waitlist`
+- Exposes `GET /waitlist/admin`
+- Exposes `GET /waitlist/export`
 - Verifies Firebase ID tokens by default
 - Applies a simple in-memory rate limit
 - Keeps the OpenAI API key on the server instead of on student devices
@@ -36,6 +39,12 @@ or all three:
 - `AI_MAX_MESSAGES=20`
 - `AI_MAX_IMAGE_BASE64_LENGTH=6000000`
 - `ALLOW_ANONYMOUS_AI=false`
+- `WAITLIST_ADMIN_TOKEN=your_secret_token`
+- `WAITLIST_EMAIL_PROVIDER=resend`
+- `WAITLIST_RESEND_API_KEY=your_resend_key`
+- `WAITLIST_CONFIRMATION_FROM_EMAIL=hello@snapmathacademy.com`
+- `WAITLIST_CONFIRMATION_REPLY_TO=hello@snapmathacademy.com`
+- `WAITLIST_CONFIRMATION_BASE_URL=https://snapmathacademy.com`
 
 `ALLOW_ANONYMOUS_AI=true` is only for temporary testing. Keep it `false` in production.
 
@@ -57,6 +66,16 @@ The health endpoint is:
 curl http://localhost:3001/health
 ```
 
+The waitlist admin endpoints are:
+
+```bash
+curl -H "Authorization: Bearer $WAITLIST_ADMIN_TOKEN" \
+  "http://localhost:3001/waitlist/admin?limit=50"
+
+curl -H "Authorization: Bearer $WAITLIST_ADMIN_TOKEN" \
+  "http://localhost:3001/waitlist/export?format=csv&limit=500"
+```
+
 ## Render deployment
 
 This repo now includes a root `render.yaml` Blueprint that deploys this service from:
@@ -73,6 +92,15 @@ or:
 - `FIREBASE_PROJECT_ID`
 - `FIREBASE_CLIENT_EMAIL`
 - `FIREBASE_PRIVATE_KEY`
+
+For waitlist admin/export and confirmation emails, also set:
+
+- `WAITLIST_ADMIN_TOKEN`
+- `WAITLIST_RESEND_API_KEY`
+- `WAITLIST_CONFIRMATION_FROM_EMAIL`
+- `WAITLIST_CONFIRMATION_REPLY_TO`
+
+The waitlist endpoints still work without the email vars, but confirmation emails will be skipped until they are configured.
 
 ## Connect the mobile app
 
