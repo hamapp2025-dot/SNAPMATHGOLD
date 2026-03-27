@@ -717,6 +717,1041 @@ async function deleteWaitlistContact(actionInput) {
   };
 }
 
+function buildWaitlistAdminUiHtml() {
+  const roleOptionsJson = JSON.stringify(Array.from(WAITLIST_ALLOWED_ROLES));
+  const interestOptionsJson = JSON.stringify(Array.from(WAITLIST_ALLOWED_INTERESTS));
+
+  return String.raw`<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SnapMath Waitlist Admin</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #07070a;
+        --panel: rgba(16, 16, 18, 0.94);
+        --panel-border: rgba(191, 160, 68, 0.22);
+        --panel-muted: rgba(255, 255, 255, 0.06);
+        --text: #f5f3ea;
+        --muted: rgba(245, 243, 234, 0.66);
+        --accent: #bfa044;
+        --danger: #ef6a5b;
+        --success: #66c27c;
+        --warning: #f5c35b;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background:
+          radial-gradient(circle at top, rgba(191, 160, 68, 0.12), transparent 28%),
+          linear-gradient(180deg, #09090c 0%, #060608 100%);
+        color: var(--text);
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+
+      a {
+        color: inherit;
+      }
+
+      .shell {
+        width: min(1480px, calc(100vw - 32px));
+        margin: 0 auto;
+        padding: 32px 0 48px;
+      }
+
+      .hero {
+        display: flex;
+        justify-content: space-between;
+        gap: 24px;
+        align-items: flex-start;
+        margin-bottom: 24px;
+      }
+
+      .hero h1 {
+        margin: 0 0 8px;
+        font-size: clamp(28px, 3vw, 40px);
+        line-height: 1.08;
+      }
+
+      .hero p {
+        margin: 0;
+        max-width: 720px;
+        color: var(--muted);
+        line-height: 1.6;
+      }
+
+      .hero-note {
+        min-width: 240px;
+        padding: 14px 16px;
+        border-radius: 16px;
+        background: rgba(191, 160, 68, 0.1);
+        border: 1px solid rgba(191, 160, 68, 0.18);
+        color: #f2e3a8;
+        font-size: 13px;
+        line-height: 1.5;
+      }
+
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--panel-border);
+        border-radius: 20px;
+        padding: 20px;
+        box-shadow: 0 22px 70px rgba(0, 0, 0, 0.22);
+      }
+
+      .stack {
+        display: grid;
+        gap: 18px;
+      }
+
+      .toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 16px;
+        align-items: end;
+      }
+
+      .toolbar-actions,
+      .filter-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+
+      .field {
+        display: grid;
+        gap: 7px;
+        min-width: 0;
+      }
+
+      .field span {
+        color: var(--muted);
+        font-size: 12px;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+      }
+
+      .field input,
+      .field select {
+        width: 100%;
+        min-height: 44px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 12px;
+        background: rgba(255, 255, 255, 0.04);
+        color: var(--text);
+        padding: 0 14px;
+        font-size: 14px;
+      }
+
+      .field input:focus,
+      .field select:focus {
+        outline: 2px solid rgba(191, 160, 68, 0.52);
+        outline-offset: 1px;
+        border-color: rgba(191, 160, 68, 0.5);
+      }
+
+      .field.token {
+        flex: 1 1 340px;
+      }
+
+      .filters-grid {
+        display: grid;
+        grid-template-columns: minmax(260px, 2fr) repeat(4, minmax(140px, 1fr));
+        gap: 14px;
+      }
+
+      .hint {
+        margin: 10px 0 0;
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      button {
+        min-height: 42px;
+        border-radius: 12px;
+        border: 1px solid transparent;
+        background: rgba(255, 255, 255, 0.07);
+        color: var(--text);
+        padding: 0 16px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: transform 120ms ease, border-color 120ms ease, background 120ms ease;
+      }
+
+      button:hover:not(:disabled) {
+        transform: translateY(-1px);
+        border-color: rgba(255, 255, 255, 0.12);
+      }
+
+      button:disabled {
+        cursor: wait;
+        opacity: 0.62;
+      }
+
+      .primary-button {
+        background: linear-gradient(135deg, rgba(191, 160, 68, 0.94), rgba(166, 134, 44, 0.94));
+        color: #090909;
+      }
+
+      .secondary-button {
+        background: rgba(191, 160, 68, 0.12);
+        border-color: rgba(191, 160, 68, 0.18);
+      }
+
+      .ghost-button {
+        background: transparent;
+        border-color: rgba(255, 255, 255, 0.12);
+      }
+
+      .stats {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 14px;
+      }
+
+      .stat {
+        padding: 16px 18px;
+        border-radius: 18px;
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid rgba(255, 255, 255, 0.06);
+      }
+
+      .stat .label {
+        display: block;
+        margin-bottom: 10px;
+        color: var(--muted);
+        font-size: 12px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .stat strong {
+        font-size: 24px;
+        line-height: 1;
+      }
+
+      .message {
+        display: none;
+        padding: 14px 16px;
+        border-radius: 14px;
+        border: 1px solid transparent;
+        font-size: 14px;
+        line-height: 1.5;
+      }
+
+      .message.visible {
+        display: block;
+      }
+
+      .message.success {
+        background: rgba(102, 194, 124, 0.11);
+        border-color: rgba(102, 194, 124, 0.26);
+        color: #d7f0dd;
+      }
+
+      .message.error {
+        background: rgba(239, 106, 91, 0.12);
+        border-color: rgba(239, 106, 91, 0.28);
+        color: #ffd9d2;
+      }
+
+      .results-meta {
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .table-shell {
+        overflow: hidden;
+        padding: 0;
+      }
+
+      .table-wrap {
+        overflow: auto;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        min-width: 1180px;
+      }
+
+      th,
+      td {
+        padding: 16px 18px;
+        text-align: left;
+        vertical-align: top;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+      }
+
+      th {
+        position: sticky;
+        top: 0;
+        background: rgba(7, 7, 10, 0.96);
+        color: rgba(245, 243, 234, 0.74);
+        font-size: 12px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        z-index: 1;
+      }
+
+      tbody tr:hover {
+        background: rgba(255, 255, 255, 0.028);
+      }
+
+      .lead-name {
+        font-weight: 700;
+        margin-bottom: 6px;
+      }
+
+      .lead-secondary,
+      .meta-line {
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.45;
+      }
+
+      .meta-line + .meta-line {
+        margin-top: 4px;
+      }
+
+      .notes {
+        max-width: 300px;
+        white-space: pre-wrap;
+        line-height: 1.52;
+        font-size: 13px;
+      }
+
+      .badge-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        min-height: 26px;
+        border-radius: 999px;
+        padding: 0 10px;
+        font-size: 12px;
+        font-weight: 700;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        background: rgba(255, 255, 255, 0.05);
+      }
+
+      .badge.status-new {
+        color: #f3e39f;
+        background: rgba(191, 160, 68, 0.16);
+        border-color: rgba(191, 160, 68, 0.24);
+      }
+
+      .badge.status-archived {
+        color: #e7d8b3;
+        background: rgba(255, 255, 255, 0.07);
+      }
+
+      .badge.email-sent {
+        color: #d2f1d9;
+        background: rgba(102, 194, 124, 0.14);
+        border-color: rgba(102, 194, 124, 0.24);
+      }
+
+      .badge.email-failed {
+        color: #ffd9d2;
+        background: rgba(239, 106, 91, 0.14);
+        border-color: rgba(239, 106, 91, 0.26);
+      }
+
+      .badge.email-skipped,
+      .badge.email-already-sent {
+        color: #f7e4b2;
+        background: rgba(245, 195, 91, 0.12);
+        border-color: rgba(245, 195, 91, 0.22);
+      }
+
+      .row-actions {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        min-width: 150px;
+      }
+
+      .row-actions button {
+        width: 100%;
+      }
+
+      .row-actions .danger {
+        border-color: rgba(239, 106, 91, 0.22);
+        background: rgba(239, 106, 91, 0.12);
+        color: #ffd9d2;
+      }
+
+      .empty-state {
+        text-align: center;
+        color: var(--muted);
+        padding: 48px 24px;
+      }
+
+      .empty-state strong {
+        display: block;
+        margin-bottom: 8px;
+        color: var(--text);
+      }
+
+      @media (max-width: 1180px) {
+        .filters-grid {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .stats {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+      }
+
+      @media (max-width: 760px) {
+        .shell {
+          width: min(100vw - 20px, 1480px);
+          padding: 20px 0 32px;
+        }
+
+        .hero {
+          flex-direction: column;
+        }
+
+        .filters-grid,
+        .stats {
+          grid-template-columns: 1fr;
+        }
+
+        .toolbar {
+          flex-direction: column;
+          align-items: stretch;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="shell">
+      <section class="hero">
+        <div>
+          <h1>SnapMath Waitlist Admin</h1>
+          <p>
+            Search, export, archive, or delete waitlist leads without touching Firestore directly.
+            This UI uses the same protected admin endpoints as the JSON API and keeps the token in
+            session storage for the current browser tab only.
+          </p>
+        </div>
+        <div class="hero-note">
+          Internal tool only.
+          <br />
+          No token is appended to the URL.
+        </div>
+      </section>
+
+      <div class="stack">
+        <section class="panel">
+          <div class="toolbar">
+            <label class="field token">
+              <span>Admin Token</span>
+              <input
+                id="token-input"
+                type="password"
+                autocomplete="off"
+                spellcheck="false"
+                placeholder="Paste WAITLIST_ADMIN_TOKEN"
+              />
+            </label>
+            <div class="toolbar-actions">
+              <button id="load-button" class="primary-button" type="button">Load Contacts</button>
+              <button id="export-json-button" class="secondary-button" type="button">Export JSON</button>
+              <button id="export-csv-button" class="secondary-button" type="button">Export CSV</button>
+              <button id="forget-token-button" class="ghost-button" type="button">Forget Token</button>
+            </div>
+          </div>
+          <p class="hint">The token is stored in <code>sessionStorage</code> for this browser tab only.</p>
+        </section>
+
+        <form id="filters-form" class="panel">
+          <div class="filters-grid">
+            <label class="field">
+              <span>Search</span>
+              <input id="search-input" type="search" placeholder="Email, name, phone, or notes" />
+            </label>
+            <label class="field">
+              <span>Role</span>
+              <select id="role-filter"></select>
+            </label>
+            <label class="field">
+              <span>Interest</span>
+              <select id="interest-filter"></select>
+            </label>
+            <label class="field">
+              <span>Status</span>
+              <select id="status-filter"></select>
+            </label>
+            <label class="field">
+              <span>Limit</span>
+              <input id="limit-input" type="number" min="1" max="1000" value="100" />
+            </label>
+          </div>
+          <div class="filter-actions">
+            <button class="primary-button" type="submit">Refresh Results</button>
+            <button id="reset-filters-button" class="ghost-button" type="button">Reset Filters</button>
+          </div>
+        </form>
+
+        <section class="stats">
+          <div class="stat">
+            <span class="label">Total Contacts</span>
+            <strong id="total-contacts">-</strong>
+          </div>
+          <div class="stat">
+            <span class="label">Returned</span>
+            <strong id="returned-contacts">-</strong>
+          </div>
+          <div class="stat">
+            <span class="label">Email Pipeline</span>
+            <strong id="email-ready">-</strong>
+          </div>
+          <div class="stat">
+            <span class="label">Current Search</span>
+            <strong id="search-summary">All</strong>
+          </div>
+        </section>
+
+        <div id="message" class="message" role="status" aria-live="polite"></div>
+        <div id="results-meta" class="results-meta">Enter an admin token, then load contacts.</div>
+
+        <section class="panel table-shell">
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Lead</th>
+                  <th>Details</th>
+                  <th>Status</th>
+                  <th>Activity</th>
+                  <th>Notes</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="contacts-body">
+                <tr>
+                  <td colspan="6" class="empty-state">
+                    <strong>No data loaded yet.</strong>
+                    Paste the admin token and click <em>Load Contacts</em>.
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+    </main>
+
+    <script>
+      const ROLE_OPTIONS = ${roleOptionsJson};
+      const INTEREST_OPTIONS = ${interestOptionsJson};
+      const STATUS_OPTIONS = ["", "new", "archived"];
+      const ROLE_LABELS = {
+        student: "Student",
+        parent: "Parent",
+        teacher: "Teacher",
+      };
+      const INTEREST_LABELS = {
+        "early-access": "Early access",
+        "monthly-plan": "Monthly plan",
+        "semester-plan": "Semester plan",
+        "annual-plan": "Annual plan",
+      };
+      const EMAIL_STATUS_LABELS = {
+        sent: "Email sent",
+        failed: "Email failed",
+        skipped: "Email skipped",
+        "already-sent": "Already sent",
+      };
+      const TOKEN_STORAGE_KEY = "snapmath_waitlist_admin_token";
+
+      const elements = {
+        tokenInput: document.getElementById("token-input"),
+        searchInput: document.getElementById("search-input"),
+        limitInput: document.getElementById("limit-input"),
+        roleFilter: document.getElementById("role-filter"),
+        interestFilter: document.getElementById("interest-filter"),
+        statusFilter: document.getElementById("status-filter"),
+        loadButton: document.getElementById("load-button"),
+        exportJsonButton: document.getElementById("export-json-button"),
+        exportCsvButton: document.getElementById("export-csv-button"),
+        forgetTokenButton: document.getElementById("forget-token-button"),
+        resetFiltersButton: document.getElementById("reset-filters-button"),
+        filtersForm: document.getElementById("filters-form"),
+        message: document.getElementById("message"),
+        resultsMeta: document.getElementById("results-meta"),
+        contactsBody: document.getElementById("contacts-body"),
+        totalContacts: document.getElementById("total-contacts"),
+        returnedContacts: document.getElementById("returned-contacts"),
+        emailReady: document.getElementById("email-ready"),
+        searchSummary: document.getElementById("search-summary"),
+      };
+
+      const state = {
+        loading: false,
+      };
+
+      function escapeHtml(value) {
+        return String(value == null ? "" : value)
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#39;");
+      }
+
+      function setMessage(kind, text) {
+        elements.message.className = "message visible " + kind;
+        elements.message.textContent = text;
+      }
+
+      function clearMessage() {
+        elements.message.className = "message";
+        elements.message.textContent = "";
+      }
+
+      function setLoading(loading) {
+        state.loading = loading;
+        elements.loadButton.disabled = loading;
+        elements.exportJsonButton.disabled = loading;
+        elements.exportCsvButton.disabled = loading;
+        elements.resetFiltersButton.disabled = loading;
+        elements.forgetTokenButton.disabled = loading;
+        elements.loadButton.textContent = loading ? "Loading..." : "Load Contacts";
+        Array.from(document.querySelectorAll("[data-contact-action]")).forEach(function (button) {
+          button.disabled = loading;
+        });
+      }
+
+      function readToken() {
+        return elements.tokenInput.value.trim();
+      }
+
+      function saveTokenToSession() {
+        const token = readToken();
+        if (!token) {
+          sessionStorage.removeItem(TOKEN_STORAGE_KEY);
+          return;
+        }
+        sessionStorage.setItem(TOKEN_STORAGE_KEY, token);
+      }
+
+      function loadTokenFromSession() {
+        elements.tokenInput.value = sessionStorage.getItem(TOKEN_STORAGE_KEY) || "";
+      }
+
+      function clearTokenFromSession() {
+        elements.tokenInput.value = "";
+        sessionStorage.removeItem(TOKEN_STORAGE_KEY);
+      }
+
+      function buildQueryString(params) {
+        const searchParams = new URLSearchParams();
+        Object.keys(params).forEach(function (key) {
+          const value = params[key];
+          if (value == null || value === "") return;
+          searchParams.set(key, String(value));
+        });
+        return searchParams.toString();
+      }
+
+      function readFilters() {
+        return {
+          limit: Math.min(1000, Math.max(1, Number(elements.limitInput.value) || 100)),
+          search: elements.searchInput.value.trim(),
+          role: elements.roleFilter.value,
+          interest: elements.interestFilter.value,
+          status: elements.statusFilter.value,
+        };
+      }
+
+      function resetFilters() {
+        elements.searchInput.value = "";
+        elements.limitInput.value = "100";
+        elements.roleFilter.value = "";
+        elements.interestFilter.value = "";
+        elements.statusFilter.value = "";
+      }
+
+      function populateSelect(select, values, labels) {
+        select.innerHTML = "";
+        const allOption = document.createElement("option");
+        allOption.value = "";
+        allOption.textContent = "All";
+        select.appendChild(allOption);
+
+        values.forEach(function (value) {
+          const option = document.createElement("option");
+          option.value = value;
+          option.textContent = labels[value] || value;
+          select.appendChild(option);
+        });
+      }
+
+      function formatDate(value) {
+        if (!value) return "—";
+        const parsed = new Date(value);
+        if (Number.isNaN(parsed.getTime())) return "—";
+        return parsed.toLocaleString();
+      }
+
+      function formatNumber(value) {
+        if (value == null || Number.isNaN(Number(value))) return "—";
+        return Number(value).toLocaleString();
+      }
+
+      async function apiFetchJson(path, options) {
+        const token = readToken();
+        if (!token) {
+          throw new Error("Enter the admin token first.");
+        }
+
+        const headers = new Headers((options && options.headers) || {});
+        headers.set("Authorization", "Bearer " + token);
+        if (options && options.body && !headers.has("Content-Type")) {
+          headers.set("Content-Type", "application/json");
+        }
+
+        const response = await fetch(path, Object.assign({}, options || {}, {
+          headers: headers,
+          cache: "no-store",
+        }));
+
+        const payload = await response.json().catch(function () {
+          return null;
+        });
+
+        if (!response.ok) {
+          const error = new Error((payload && payload.error) || response.statusText || "Request failed");
+          error.status = response.status;
+          error.payload = payload;
+          throw error;
+        }
+
+        return payload;
+      }
+
+      function getSearchSummary(filters) {
+        const parts = [];
+        if (filters.search) parts.push("search");
+        if (filters.role) parts.push(ROLE_LABELS[filters.role] || filters.role);
+        if (filters.interest) parts.push(INTEREST_LABELS[filters.interest] || filters.interest);
+        if (filters.status) parts.push(filters.status);
+        if (!parts.length) return "All";
+        return parts.join(" · ");
+      }
+
+      function renderSummary(data) {
+        const filters = data.filters || {};
+        elements.totalContacts.textContent = formatNumber(data.totalContacts);
+        elements.returnedContacts.textContent = formatNumber(data.returnedContacts);
+        elements.emailReady.textContent = data.waitlistEmailReady ? "Ready" : "Not ready";
+        elements.searchSummary.textContent = getSearchSummary(filters);
+        elements.resultsMeta.textContent =
+          "Showing " +
+          formatNumber(data.returnedContacts) +
+          " of " +
+          formatNumber(data.totalContacts) +
+          " contacts. Limit " +
+          formatNumber(data.limit) +
+          ".";
+      }
+
+      function buildBadge(label, className) {
+        return '<span class="badge ' + className + '">' + escapeHtml(label) + "</span>";
+      }
+
+      function renderStatusBadges(contact) {
+        const badges = [];
+        const statusClass = contact.status === "archived" ? "status-archived" : "status-new";
+        badges.push(buildBadge(contact.status || "unknown", statusClass));
+
+        if (contact.confirmationEmailStatus) {
+          const emailClass = "email-" + String(contact.confirmationEmailStatus).replace(/[^a-z-]/g, "");
+          badges.push(buildBadge(
+            EMAIL_STATUS_LABELS[contact.confirmationEmailStatus] || contact.confirmationEmailStatus,
+            emailClass
+          ));
+        }
+
+        return '<div class="badge-row">' + badges.join("") + "</div>";
+      }
+
+      function renderRow(contact) {
+        const details = [
+          ROLE_LABELS[contact.role] || contact.role || "—",
+          INTEREST_LABELS[contact.interest] || contact.interest || "—",
+          contact.locale || "—",
+        ];
+
+        const activity = [];
+        activity.push('<div class="meta-line"><strong>Last:</strong> ' + escapeHtml(formatDate(contact.lastSubmittedAt)) + "</div>");
+        activity.push('<div class="meta-line"><strong>First:</strong> ' + escapeHtml(formatDate(contact.firstSubmittedAt)) + "</div>");
+        if (contact.archivedAt) {
+          activity.push('<div class="meta-line"><strong>Archived:</strong> ' + escapeHtml(formatDate(contact.archivedAt)) + "</div>");
+        }
+        activity.push('<div class="meta-line"><strong>Submissions:</strong> ' + escapeHtml(formatNumber(contact.submissionCount)) + "</div>");
+
+        const actionButtons = [];
+        if (contact.status !== "archived") {
+          actionButtons.push(
+            '<button type="button" data-contact-action="archive" data-contact-id="' +
+              escapeHtml(contact.id) +
+              '" data-contact-email="' +
+              escapeHtml(contact.email || "") +
+              '">Archive</button>'
+          );
+        }
+        actionButtons.push(
+          '<button type="button" class="danger" data-contact-action="delete" data-contact-id="' +
+            escapeHtml(contact.id) +
+            '" data-contact-email="' +
+            escapeHtml(contact.email || "") +
+            '">Delete</button>'
+        );
+
+        return (
+          "<tr>" +
+            "<td>" +
+              '<div class="lead-name">' + escapeHtml(contact.name || "Unnamed lead") + "</div>" +
+              '<div class="lead-secondary">' + escapeHtml(contact.email || "—") + "</div>" +
+              (contact.phone ? '<div class="lead-secondary">' + escapeHtml(contact.phone) + "</div>" : "") +
+            "</td>" +
+            "<td>" +
+              '<div class="meta-line"><strong>Role:</strong> ' + escapeHtml(details[0]) + "</div>" +
+              '<div class="meta-line"><strong>Interest:</strong> ' + escapeHtml(details[1]) + "</div>" +
+              '<div class="meta-line"><strong>Locale:</strong> ' + escapeHtml(details[2]) + "</div>" +
+              '<div class="meta-line"><strong>Source:</strong> ' + escapeHtml(contact.source || "—") + "</div>" +
+            "</td>" +
+            "<td>" +
+              renderStatusBadges(contact) +
+              (contact.archivedReason
+                ? '<div class="meta-line" style="margin-top:10px"><strong>Reason:</strong> ' + escapeHtml(contact.archivedReason) + "</div>"
+                : "") +
+              (contact.lastConfirmationError
+                ? '<div class="meta-line" style="margin-top:10px"><strong>Email error:</strong> ' + escapeHtml(contact.lastConfirmationError) + "</div>"
+                : "") +
+            "</td>" +
+            "<td>" + activity.join("") + "</td>" +
+            "<td><div class=\"notes\">" + escapeHtml(contact.notes || "—") + "</div></td>" +
+            '<td><div class="row-actions">' + actionButtons.join("") + "</div></td>" +
+          "</tr>"
+        );
+      }
+
+      function renderContacts(contacts) {
+        if (!Array.isArray(contacts) || contacts.length === 0) {
+          elements.contactsBody.innerHTML =
+            '<tr><td colspan="6" class="empty-state"><strong>No contacts matched these filters.</strong>Try a broader search or increase the limit.</td></tr>';
+          return;
+        }
+
+        elements.contactsBody.innerHTML = contacts.map(renderRow).join("");
+        Array.from(elements.contactsBody.querySelectorAll("[data-contact-action]")).forEach(function (button) {
+          button.addEventListener("click", function () {
+            handleContactAction(button);
+          });
+        });
+      }
+
+      async function loadContacts(options) {
+        const config = Object.assign({ silent: false }, options || {});
+        clearMessage();
+        saveTokenToSession();
+        setLoading(true);
+
+        try {
+          const filters = readFilters();
+          const query = buildQueryString(filters);
+          const data = await apiFetchJson("/waitlist/admin" + (query ? "?" + query : ""));
+          renderSummary(data);
+          renderContacts(data.contacts || []);
+          if (!config.silent) {
+            setMessage("success", "Loaded " + formatNumber(data.returnedContacts) + " waitlist contacts.");
+          }
+        } catch (error) {
+          setMessage("error", error.message || "Could not load waitlist contacts.");
+        } finally {
+          setLoading(false);
+        }
+      }
+
+      async function exportContacts(format) {
+        clearMessage();
+        saveTokenToSession();
+        setLoading(true);
+
+        try {
+          const token = readToken();
+          if (!token) {
+            throw new Error("Enter the admin token first.");
+          }
+
+          const filters = readFilters();
+          const query = buildQueryString(Object.assign({ format: format }, filters));
+          const response = await fetch("/waitlist/export?" + query, {
+            headers: {
+              Authorization: "Bearer " + token,
+            },
+            cache: "no-store",
+          });
+
+          if (!response.ok) {
+            const payload = await response.json().catch(function () {
+              return null;
+            });
+            throw new Error((payload && payload.error) || "Export failed.");
+          }
+
+          const blob = await response.blob();
+          const disposition = response.headers.get("Content-Disposition") || "";
+          const match = disposition.match(/filename="([^"]+)"/);
+          const filename = match ? match[1] : "snapmath-waitlist." + (format === "csv" ? "csv" : "json");
+          const url = URL.createObjectURL(blob);
+          const anchor = document.createElement("a");
+          anchor.href = url;
+          anchor.download = filename;
+          document.body.appendChild(anchor);
+          anchor.click();
+          anchor.remove();
+          URL.revokeObjectURL(url);
+          setMessage("success", "Downloaded " + filename + ".");
+        } catch (error) {
+          setMessage("error", error.message || "Could not export waitlist contacts.");
+        } finally {
+          setLoading(false);
+        }
+      }
+
+      async function handleContactAction(button) {
+        const action = button.getAttribute("data-contact-action");
+        const contactId = button.getAttribute("data-contact-id");
+        const email = button.getAttribute("data-contact-email") || "";
+
+        if (!action || !contactId) return;
+
+        let payload = {
+          action: action,
+          contactId: contactId,
+          email: email,
+        };
+
+        if (action === "archive") {
+          const reason = window.prompt("Archive reason (optional)", "cleanup");
+          if (reason === null) return;
+          payload.reason = reason.trim();
+        }
+
+        if (action === "delete") {
+          const confirmed = window.confirm(
+            "Delete " + (email || "this contact") + " and its waitlist event history?"
+          );
+          if (!confirmed) return;
+          payload.confirm = "delete";
+        }
+
+        clearMessage();
+        setLoading(true);
+
+        try {
+          const data = await apiFetchJson("/waitlist/admin/contact", {
+            method: "POST",
+            body: JSON.stringify(payload),
+          });
+
+          let successMessage = "";
+          if (action === "archive") {
+            successMessage = "Archived " + (email || contactId) + ".";
+          } else {
+            successMessage =
+              "Deleted " +
+              (email || contactId) +
+              " and removed " +
+              formatNumber(data.deletedEventCount || 0) +
+              " linked event records.";
+          }
+
+          await loadContacts({ silent: true });
+          setMessage("success", successMessage);
+        } catch (error) {
+          setMessage("error", error.message || "Could not update the contact.");
+        } finally {
+          setLoading(false);
+        }
+      }
+
+      function initializeUi() {
+        populateSelect(elements.roleFilter, ROLE_OPTIONS, ROLE_LABELS);
+        populateSelect(elements.interestFilter, INTEREST_OPTIONS, INTEREST_LABELS);
+        populateSelect(elements.statusFilter, STATUS_OPTIONS.filter(Boolean), {
+          new: "New",
+          archived: "Archived",
+        });
+
+        loadTokenFromSession();
+
+        elements.filtersForm.addEventListener("submit", function (event) {
+          event.preventDefault();
+          loadContacts();
+        });
+
+        elements.loadButton.addEventListener("click", function () {
+          loadContacts();
+        });
+
+        elements.exportJsonButton.addEventListener("click", function () {
+          exportContacts("json");
+        });
+
+        elements.exportCsvButton.addEventListener("click", function () {
+          exportContacts("csv");
+        });
+
+        elements.forgetTokenButton.addEventListener("click", function () {
+          clearTokenFromSession();
+          elements.totalContacts.textContent = "-";
+          elements.returnedContacts.textContent = "-";
+          elements.emailReady.textContent = "-";
+          elements.searchSummary.textContent = "All";
+          elements.resultsMeta.textContent = "Token cleared. Paste it again to load contacts.";
+          elements.contactsBody.innerHTML =
+            '<tr><td colspan="6" class="empty-state"><strong>Token removed.</strong>Paste it again to load contacts.</td></tr>';
+          clearMessage();
+        });
+
+        elements.resetFiltersButton.addEventListener("click", function () {
+          resetFilters();
+        });
+
+        elements.tokenInput.addEventListener("change", saveTokenToSession);
+
+        if (readToken()) {
+          loadContacts({ silent: true });
+        }
+      }
+
+      initializeUi();
+    </script>
+  </body>
+</html>`;
+}
+
 async function storeWaitlistLead(req, submission) {
   const db = admin.firestore();
   const submittedAt = admin.firestore.FieldValue.serverTimestamp();
@@ -1058,6 +2093,23 @@ app.post('/waitlist', applyRateLimit, async (req, res) => {
     console.error('[ai-proxy] Waitlist submit failed:', error);
     return res.status(500).json({ error: 'waitlist_store_failed' });
   }
+});
+
+app.get('/waitlist/admin/ui', (_req, res) => {
+  res.set('Cache-Control', 'no-store');
+  res.set('Referrer-Policy', 'no-referrer');
+  res.set('X-Frame-Options', 'DENY');
+  res.set('X-Robots-Tag', 'noindex, nofollow');
+  res.set(
+    'Content-Security-Policy',
+    "default-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'; connect-src 'self'; img-src 'self' data:; object-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'",
+  );
+
+  if (!WAITLIST_ADMIN_TOKEN) {
+    return res.status(503).type('html').send('<h1>Waitlist admin is not configured.</h1>');
+  }
+
+  return res.type('html').send(buildWaitlistAdminUiHtml());
 });
 
 app.get('/waitlist/admin', authenticateWaitlistAdmin, async (req, res) => {

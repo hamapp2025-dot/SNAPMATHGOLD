@@ -8,6 +8,7 @@ Small Express service that turns `AI Chat` and `MathScan` into managed backend f
 - Exposes `POST /ai/vision`
 - Exposes `POST /waitlist`
 - Exposes `GET /waitlist/admin`
+- Exposes `GET /waitlist/admin/ui`
 - Exposes `POST /waitlist/admin/contact`
 - Exposes `GET /waitlist/export`
 - Verifies Firebase ID tokens by default
@@ -88,6 +89,14 @@ curl -X POST \
 curl -H "Authorization: Bearer $WAITLIST_ADMIN_TOKEN" \
   "http://localhost:3001/waitlist/export?format=csv&limit=500"
 ```
+
+The admin browser UI is:
+
+```bash
+open "http://localhost:3001/waitlist/admin/ui"
+```
+
+Paste `WAITLIST_ADMIN_TOKEN` into the UI to search, export, archive, or delete waitlist contacts without using raw API calls.
 
 ## Render deployment
 
