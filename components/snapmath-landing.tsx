@@ -18,7 +18,6 @@ import {
   PenSquare,
   PlayCircle,
   Presentation,
-  Quote,
   ScanLine,
   Sparkles,
   Video,
@@ -74,10 +73,10 @@ type ComparisonRow = {
   tutors: LocalizedText;
 };
 
-type Testimonial = {
-  quote: LocalizedText;
-  name: LocalizedText;
-  role: LocalizedText;
+type CommunityCard = {
+  title: LocalizedText;
+  subtitle: LocalizedText;
+  body: LocalizedText;
 };
 
 type WaitlistFormState = {
@@ -460,47 +459,47 @@ const comparisonRows: ComparisonRow[] = [
   },
 ];
 
-const testimonials: Testimonial[] = [
+const communityCards: CommunityCard[] = [
   {
-    quote: {
-      ar: "هنا ستظهر آراء الطلبة الأوائل عندما يبدأ الإطلاق الرسمي.",
-      en: "Early student testimonials will appear here as we roll out the first launch cohort.",
+    title: {
+      ar: "أولوية الدخول لأول دفعة",
+      en: "Priority access to the first cohort",
     },
-    name: {
-      ar: "طالب توجيهي",
-      en: "Tawjihi Student",
+    subtitle: {
+      ar: "دعوات مبكرة قبل الإطلاق العام",
+      en: "Early invitations before the public launch",
     },
-    role: {
-      ar: "قريباً",
-      en: "Coming soon",
+    body: {
+      ar: "التسجيل في القائمة يعني أن روابط الوصول الأولى وتحديثات الإطلاق ستصل إليك قبل فتح التطبيق للعامة.",
+      en: "Joining the waitlist means the first access links and launch updates reach you before the wider public rollout.",
     },
   },
   {
-    quote: {
-      ar: "هذا القسم جاهز لقصص النجاح، النتائج، وتجارب الأهل والمعلمين.",
-      en: "This section is ready for parent reactions, teacher feedback, and real student outcomes.",
+    title: {
+      ar: "وضوح كامل للأهل قبل الاشتراك",
+      en: "Clear plan for families before they commit",
     },
-    name: {
-      ar: "ولي أمر",
-      en: "Parent",
+    subtitle: {
+      ar: "تفاصيل الاشتراك وما الذي يتضمنه كل خيار",
+      en: "Pricing, coverage, and what each plan unlocks",
     },
-    role: {
-      ar: "قريباً",
-      en: "Coming soon",
+    body: {
+      ar: "سنرسل توقيت الإطلاق، ما الذي يتضمنه كل اشتراك، وكيف يبدأ الوصول الفعلي حتى يكون القرار واضحاً للعائلة.",
+      en: "We will share launch timing, what each subscription includes, and how access opens so families can decide with confidence.",
     },
   },
   {
-    quote: {
-      ar: "مع كل دفعة جديدة، سنعرض كيف يتحول الفهم من الحفظ إلى رؤية رياضية واضحة.",
-      en: "As the first cohorts arrive, we will showcase how students move from memorisation to real visual understanding.",
+    title: {
+      ar: "متابعة حقيقية من أول يوم",
+      en: "Real launch updates from day one",
     },
-    name: {
-      ar: "معلم رياضيات",
-      en: "Math Teacher",
+    subtitle: {
+      ar: "مقاطع دروس، تحديثات منتج، ولحظات الإطلاق",
+      en: "Lesson clips, product updates, and launch milestones",
     },
-    role: {
-      ar: "قريباً",
-      en: "Coming soon",
+    body: {
+      ar: "إنستغرام، تيك توك، ويوتيوب ستكون مكاننا لنشر المقاطع القصيرة، التحديثات، وأخبار التقدم أولاً بأول.",
+      en: "Instagram, TikTok, and YouTube are where we will share short lesson previews, product updates, and launch progress as it happens.",
     },
   },
 ];
@@ -1377,31 +1376,44 @@ export function SnapMathLanding() {
 
         <Section id="community" className="mx-auto max-w-7xl px-6 py-20 md:py-28">
           <div className={textAlign}>
-            <p className="section-label">
-              {isArabic ? "انضم لمجتمعنا" : "Join our community"}
-            </p>
+            <p className="section-label">{isArabic ? "الدفعة الأولى" : "First Cohort"}</p>
             <h2 className={`mt-4 text-3xl font-semibold text-white sm:text-5xl ${headingClass}`}>
               {isArabic
-                ? "قريباً: آراء الطلبة، النتائج، وحضور سناب ماث على السوشال"
-                : "Coming soon: student reactions, launch stories, and SnapMath on social"}
+                ? "ماذا يحصل المنضمون مبكراً عندما يسجلون الآن؟"
+                : "What early students and families get by joining now"}
             </h2>
+            <p className="mt-5 max-w-3xl text-base leading-8 text-white/68">
+              {isArabic
+                ? "بدلاً من شهادات مؤقتة قبل الإطلاق، هذا ما نعد به فعلياً لأول دفعة من سناب ماث."
+                : "Instead of filling this section with placeholder testimonials before launch, here is what the first SnapMath cohort actually gets."}
+            </p>
           </div>
 
           <div className="mt-10 grid gap-5 lg:grid-cols-3">
-            {testimonials.map((testimonial) => (
+            {communityCards.map((card) => (
               <div
-                key={copyFor(locale, testimonial.name)}
-                className="rounded-[2rem] border border-white/10 bg-white/5 p-6"
+                key={copyFor(locale, card.title)}
+                className="rounded-[2rem] border border-white/10 bg-white/5 p-6 backdrop-blur-sm"
               >
-                <Quote className="h-8 w-8 text-[#BFA044]" />
-                <p className={`mt-5 text-base leading-8 text-white/68 ${textAlign}`}>
-                  {copyFor(locale, testimonial.quote)}
-                </p>
-                <div className={`mt-6 ${textAlign}`}>
+                <div
+                  className={`inline-flex items-center gap-2 rounded-full border border-[#BFA044]/30 bg-[#BFA044]/10 px-3 py-1 text-xs uppercase tracking-[0.18em] text-[#F5E7A6] ${
+                    isArabic ? "flex-row-reverse" : ""
+                  }`}
+                >
+                  <Sparkles className="h-3.5 w-3.5" />
+                  <span>{isArabic ? "ميزة مبكرة" : "Early access"}</span>
+                </div>
+                <div className={`mt-5 ${textAlign}`}>
                   <p className={`text-lg font-semibold text-white ${headingClass}`}>
-                    {copyFor(locale, testimonial.name)}
+                    {copyFor(locale, card.title)}
                   </p>
-                  <p className="text-sm text-white/45">{copyFor(locale, testimonial.role)}</p>
+                  <p className="mt-2 text-sm text-[#F5E7A6]/80">{copyFor(locale, card.subtitle)}</p>
+                </div>
+                <p className={`mt-5 text-base leading-8 text-white/68 ${textAlign}`}>
+                  {copyFor(locale, card.body)}
+                </p>
+                <div className={`mt-6 text-sm text-white/45 ${textAlign}`}>
+                  {isArabic ? "أولوية وصول + تحديثات إطلاق" : "Priority access + launch updates"}
                 </div>
               </div>
             ))}
@@ -1417,7 +1429,7 @@ export function SnapMathLanding() {
               }`}
             >
               <Camera className="h-4 w-4 text-[#F5E7A6]" />
-              <span dir="ltr">{socialHandle}</span>
+              <span dir="ltr">Instagram · {socialHandle}</span>
             </a>
             <a
               href="https://www.tiktok.com/@snapmathacademy"
@@ -1428,7 +1440,7 @@ export function SnapMathLanding() {
               }`}
             >
               <Music2 className="h-4 w-4 text-[#F5E7A6]" />
-              <span dir="ltr">{socialHandle}</span>
+              <span dir="ltr">TikTok · {socialHandle}</span>
             </a>
             <a
               href="https://youtube.com/@snapmathacademy"
@@ -1439,7 +1451,7 @@ export function SnapMathLanding() {
               }`}
             >
               <Video className="h-4 w-4 text-[#F5E7A6]" />
-              <span dir="ltr">{socialHandle}</span>
+              <span dir="ltr">YouTube · {socialHandle}</span>
             </a>
           </div>
         </Section>
@@ -1494,7 +1506,7 @@ export function SnapMathLanding() {
                   {isArabic ? "App Store" : "App Store"}
                 </span>
                 <span className="mt-1 block font-medium">
-                  {isArabic ? "الإطلاق قريباً" : "Launches Soon"}
+                  {isArabic ? "احصل على تنبيهات الإطلاق" : "Get launch alerts"}
                 </span>
               </span>
             </a>
