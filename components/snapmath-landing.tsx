@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent, type MouseEvent } from "react";
 import { motion } from "framer-motion";
 import type { LucideIcon } from "lucide-react";
 import {
@@ -79,13 +79,17 @@ type CommunityCard = {
   body: LocalizedText;
 };
 
+type WaitlistRole = "student" | "parent" | "teacher";
+type WaitlistInterest = "early-access" | "monthly-plan" | "semester-plan" | "annual-plan";
+
 type WaitlistFormState = {
   name: string;
   email: string;
   phone: string;
-  role: string;
-  interest: string;
+  role: WaitlistRole;
+  interest: WaitlistInterest;
   notes: string;
+  website: string;
 };
 
 const navItems: NavItem[] = [
@@ -504,10 +508,11 @@ const communityCards: CommunityCard[] = [
   },
 ];
 
-const launchInterestHref = "#waitlist";
-const subscriptionInterestHref = "#waitlist";
+const waitlistSectionId = "waitlist";
+const waitlistAnchorHref = `#${waitlistSectionId}`;
 const socialHandle = "@snapmathacademy";
-const formSubmitEndpoint = "https://formsubmit.co/ajax/hello@snapmathacademy.com";
+const waitlistApiUrl =
+  process.env.NEXT_PUBLIC_WAITLIST_API_URL?.trim() || "https://snapmath-ai-proxy.onrender.com/waitlist";
 const lessonDemoVideoUrl = "/demo-video.mp4";
 const lessonDemoPosterUrl = "/demo-poster.png";
 const emptyWaitlistForm: WaitlistFormState = {
@@ -517,10 +522,24 @@ const emptyWaitlistForm: WaitlistFormState = {
   role: "student",
   interest: "early-access",
   notes: "",
+  website: "",
 };
 
 function copyFor(locale: Locale, text: LocalizedText) {
   return text[locale];
+}
+
+function interestForTier(tierId: string): WaitlistInterest {
+  switch (tierId) {
+    case "monthly":
+      return "monthly-plan";
+    case "semester":
+      return "semester-plan";
+    case "annual":
+      return "annual-plan";
+    default:
+      return "early-access";
+  }
 }
 
 function Section({
@@ -554,6 +573,8 @@ export function SnapMathLanding() {
     "idle"
   );
   const [waitlistMessage, setWaitlistMessage] = useState("");
+  const nameInputRef = useRef<HTMLInputElement>(null);
+  const emailInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const stored = window.localStorage.getItem("snapmath-locale");
@@ -598,12 +619,22 @@ export function SnapMathLanding() {
         : "For example: current grade, hardest unit, or which plan you want first.",
       submit: isArabic ? "انضم إلى قائمة الانتظار" : "Join the waitlist",
       submitting: isArabic ? "جارٍ الإرسال..." : "Submitting...",
-      success: isArabic
+      successNew: isArabic
         ? "تم تسجيلك بنجاح. سنراسلك أول ما نفتح الوصول."
         : "You are on the list. We will contact you as soon as access opens.",
+      successExisting: isArabic
+        ? "أنت مسجل بالفعل. حدّثنا تفضيلاتك وسنستمر بإرسال أحدث أخبار الإطلاق."
+        : "You were already on the list. We updated your preferences and will keep you posted.",
       error: isArabic
         ? "تعذر إرسال الطلب الآن. جرّب مرة أخرى أو راسلنا مباشرة على hello@snapmathacademy.com"
         : "We could not submit right now. Please try again or email us directly at hello@snapmathacademy.com.",
+      rateLimit: isArabic
+        ? "أرسلت عدة محاولات بسرعة. انتظر دقيقة ثم جرّب مرة أخرى."
+        : "You submitted too many times in a short window. Please wait a minute and try again.",
+      currentSelection: isArabic ? "الخيار الحالي" : "Current selection",
+      noPayment: isArabic
+        ? "لا يوجد أي دفع الآن. نستخدم هذه البيانات فقط لإرسال تحديثات الإطلاق والباقات."
+        : "No payment today. We only use this form for launch updates and plan details.",
       roleOptions: [
         { value: "student", label: isArabic ? "طالب / طالبة" : "Student" },
         { value: "parent", label: isArabic ? "ولي أمر" : "Parent" },
@@ -615,6 +646,12 @@ export function SnapMathLanding() {
         { value: "semester-plan", label: isArabic ? "الاشتراك الفصلي" : "Semester plan" },
         { value: "annual-plan", label: isArabic ? "الاشتراك السنوي" : "Annual plan" },
       ],
+      benefitItems: [
+        isArabic ? "لا يوجد أي دفع الآن" : "No payment today",
+        isArabic ? "يستغرق أقل من 30 ثانية" : "Takes less than 30 seconds",
+        isArabic ? "سنرسل موعد فتح الدفعة الأولى" : "We email you when the first cohort opens",
+        isArabic ? "تصلك تفاصيل الخطط قبل أي التزام" : "You get plan details before any commitment",
+      ],
       disclaimer: isArabic
         ? "نستخدم هذه المعلومات فقط للتواصل حول الإطلاق والاشتراك. لن نشارك بياناتك مع أي طرف خارجي."
         : "We only use this information for launch and subscription updates. We do not share your details with third parties.",
@@ -622,8 +659,25 @@ export function SnapMathLanding() {
     [isArabic]
   );
 
-  const updateWaitlistField = (field: keyof WaitlistFormState, value: string) => {
+  const updateWaitlistField = <K extends keyof WaitlistFormState>(field: K, value: WaitlistFormState[K]) => {
     setWaitlistForm((current) => ({ ...current, [field]: value }));
+  };
+
+  const jumpToWaitlist = (interest: WaitlistInterest) => {
+    setWaitlistForm((current) => ({ ...current, interest, website: "" }));
+    setWaitlistState("idle");
+    setWaitlistMessage("");
+    document.getElementById(waitlistSectionId)?.scrollIntoView({ behavior: "smooth", block: "start" });
+
+    window.setTimeout(() => {
+      const target = waitlistForm.name.trim() ? emailInputRef.current : nameInputRef.current;
+      target?.focus();
+    }, 450);
+  };
+
+  const handleWaitlistCta = (interest: WaitlistInterest) => (event: MouseEvent<HTMLAnchorElement>) => {
+    event.preventDefault();
+    jumpToWaitlist(interest);
   };
 
   const submitWaitlist = async (event: FormEvent<HTMLFormElement>) => {
@@ -632,7 +686,7 @@ export function SnapMathLanding() {
     setWaitlistMessage("");
 
     try {
-      const response = await fetch(formSubmitEndpoint, {
+      const response = await fetch(waitlistApiUrl, {
         method: "POST",
         headers: {
           Accept: "application/json",
@@ -645,23 +699,28 @@ export function SnapMathLanding() {
           role: waitlistForm.role,
           interest: waitlistForm.interest,
           notes: waitlistForm.notes,
+          website: waitlistForm.website,
           locale,
-          _subject: "SnapMath Academy waitlist signup",
-          _template: "table",
-          _captcha: "false",
         }),
       });
+      const payload = (await response.json().catch(() => null)) as
+        | { duplicate?: boolean; error?: string }
+        | null;
 
       if (!response.ok) {
-        throw new Error("waitlist-submit-failed");
+        throw new Error(payload?.error || "waitlist-submit-failed");
       }
 
       setWaitlistState("success");
-      setWaitlistMessage(waitlistCopy.success);
+      setWaitlistMessage(payload?.duplicate ? waitlistCopy.successExisting : waitlistCopy.successNew);
       setWaitlistForm(emptyWaitlistForm);
-    } catch {
+    } catch (error) {
       setWaitlistState("error");
-      setWaitlistMessage(waitlistCopy.error);
+      setWaitlistMessage(
+        error instanceof Error && error.message === "rate_limit_exceeded"
+          ? waitlistCopy.rateLimit
+          : waitlistCopy.error
+      );
     }
   };
 
@@ -685,6 +744,10 @@ export function SnapMathLanding() {
     }),
     [isArabic]
   );
+
+  const selectedInterestLabel =
+    waitlistCopy.interestOptions.find((option) => option.value === waitlistForm.interest)?.label ??
+    waitlistCopy.interestOptions[0].label;
 
   return (
     <div
@@ -750,7 +813,8 @@ export function SnapMathLanding() {
             </button>
 
             <a
-              href={launchInterestHref}
+              href={waitlistAnchorHref}
+              onClick={handleWaitlistCta("early-access")}
               className={`inline-flex items-center gap-2 rounded-full bg-[#BFA044] px-4 py-2 text-sm font-semibold text-black transition hover:scale-[1.02] hover:bg-[#d8ba59] ${
                 isArabic ? "flex-row-reverse" : ""
               }`}
@@ -803,7 +867,8 @@ export function SnapMathLanding() {
                 className={`mt-8 flex flex-col gap-4 sm:flex-row ${isArabic ? "sm:flex-row-reverse" : ""}`}
               >
                 <a
-                  href={launchInterestHref}
+                  href={waitlistAnchorHref}
+                  onClick={handleWaitlistCta("early-access")}
                   className={`inline-flex items-center justify-center gap-2 rounded-full bg-[#BFA044] px-6 py-3 text-base font-semibold text-black transition hover:scale-[1.02] hover:bg-[#d8ba59] ${
                     isArabic ? "flex-row-reverse" : ""
                   }`}
@@ -1146,7 +1211,8 @@ export function SnapMathLanding() {
                 </p>
 
                 <a
-                  href={subscriptionInterestHref}
+                  href={waitlistAnchorHref}
+                  onClick={handleWaitlistCta(interestForTier(tier.id))}
                   className={`mt-8 inline-flex w-full items-center justify-center gap-2 rounded-full px-5 py-3 text-base font-semibold transition ${
                     tier.featured
                       ? "bg-[#BFA044] text-black hover:bg-[#d8ba59]"
@@ -1167,7 +1233,7 @@ export function SnapMathLanding() {
           </p>
         </Section>
 
-        <Section id="waitlist" className="mx-auto max-w-7xl px-6 py-20 md:py-28">
+        <Section id={waitlistSectionId} className="mx-auto max-w-7xl px-6 py-20 md:py-28">
           <div className="grid gap-8 lg:grid-cols-[0.9fr_1.1fr] lg:items-start">
             <div className={textAlign}>
               <p className="section-label">{waitlistCopy.kicker}</p>
@@ -1179,12 +1245,7 @@ export function SnapMathLanding() {
               </p>
 
               <div className="mt-8 grid gap-4 sm:grid-cols-2">
-                {[
-                  isArabic ? "أولوية الوصول قبل الإطلاق العام" : "Priority access before public launch",
-                  isArabic ? "تحديثات مباشرة حول الدروس والباقات" : "Direct updates on lessons and pricing",
-                  isArabic ? "دعوات مبكرة لأول التجارب" : "Early invitations for the first cohort",
-                  isArabic ? "رد سريع لفهم ما يحتاجه الطالب" : "Fast follow-up to match the right student plan",
-                ].map((item) => (
+                {waitlistCopy.benefitItems.map((item) => (
                   <div
                     key={item}
                     className={`rounded-[1.6rem] border border-white/10 bg-white/5 px-5 py-4 text-sm text-white/72 ${
@@ -1202,10 +1263,22 @@ export function SnapMathLanding() {
 
             <div className="rounded-[2rem] border border-[#BFA044]/20 bg-[linear-gradient(180deg,rgba(191,160,68,0.10),rgba(255,255,255,0.03))] p-6 shadow-[0_30px_80px_rgba(0,0,0,0.45)]">
               <form className="space-y-4" onSubmit={submitWaitlist}>
+                <input
+                  tabIndex={-1}
+                  autoComplete="off"
+                  value={waitlistForm.website}
+                  onChange={(event) => updateWaitlistField("website", event.target.value)}
+                  className="hidden"
+                  aria-hidden="true"
+                />
+
                 <div className="grid gap-4 md:grid-cols-2">
                   <label className="block">
                     <span className={`mb-2 block text-sm text-white/65 ${textAlign}`}>{waitlistCopy.name}</span>
                     <input
+                      ref={nameInputRef}
+                      name="name"
+                      autoComplete="name"
                       required
                       value={waitlistForm.name}
                       onChange={(event) => updateWaitlistField("name", event.target.value)}
@@ -1217,6 +1290,9 @@ export function SnapMathLanding() {
                   <label className="block">
                     <span className={`mb-2 block text-sm text-white/65 ${textAlign}`}>{waitlistCopy.email}</span>
                     <input
+                      ref={emailInputRef}
+                      name="email"
+                      autoComplete="email"
                       required
                       type="email"
                       value={waitlistForm.email}
@@ -1232,6 +1308,8 @@ export function SnapMathLanding() {
                   <label className="block">
                     <span className={`mb-2 block text-sm text-white/65 ${textAlign}`}>{waitlistCopy.phone}</span>
                     <input
+                      name="phone"
+                      autoComplete="tel"
                       value={waitlistForm.phone}
                       onChange={(event) => updateWaitlistField("phone", event.target.value)}
                       dir="ltr"
@@ -1244,7 +1322,7 @@ export function SnapMathLanding() {
                     <span className={`mb-2 block text-sm text-white/65 ${textAlign}`}>{waitlistCopy.role}</span>
                     <select
                       value={waitlistForm.role}
-                      onChange={(event) => updateWaitlistField("role", event.target.value)}
+                      onChange={(event) => updateWaitlistField("role", event.target.value as WaitlistRole)}
                       className={`w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-base text-white outline-none transition focus:border-[#BFA044]/60 focus:bg-black/35 ${textAlign}`}
                     >
                       {waitlistCopy.roleOptions.map((option) => (
@@ -1265,7 +1343,9 @@ export function SnapMathLanding() {
                         <button
                           key={option.value}
                           type="button"
-                          onClick={() => updateWaitlistField("interest", option.value)}
+                          onClick={() =>
+                            updateWaitlistField("interest", option.value as WaitlistInterest)
+                          }
                           className={`rounded-2xl border px-4 py-3 text-sm transition ${
                             selected
                               ? "border-[#BFA044]/60 bg-[#BFA044]/12 text-[#F5E7A6]"
@@ -1278,6 +1358,10 @@ export function SnapMathLanding() {
                     })}
                   </div>
                 </label>
+
+                <div className={`rounded-2xl border border-[#BFA044]/20 bg-[#BFA044]/10 px-4 py-3 text-sm text-[#F5E7A6] ${textAlign}`}>
+                  <span className="font-semibold">{waitlistCopy.currentSelection}:</span> {selectedInterestLabel}
+                </div>
 
                 <label className="block">
                   <span className={`mb-2 block text-sm text-white/65 ${textAlign}`}>{waitlistCopy.notes}</span>
@@ -1310,10 +1394,13 @@ export function SnapMathLanding() {
                   </a>
                 </div>
 
+                <p className={`text-xs leading-6 text-white/52 ${textAlign}`}>{waitlistCopy.noPayment}</p>
                 <p className={`text-sm leading-7 text-white/45 ${textAlign}`}>{waitlistCopy.disclaimer}</p>
 
                 {waitlistMessage ? (
                   <div
+                    aria-live="polite"
+                    role={waitlistState === "error" ? "alert" : "status"}
                     className={`rounded-2xl border px-4 py-3 text-sm ${
                       waitlistState === "success"
                         ? "border-emerald-400/30 bg-emerald-400/10 text-emerald-100"
@@ -1495,7 +1582,8 @@ export function SnapMathLanding() {
 
           <div className={`flex flex-col gap-4 ${isArabic ? "items-end" : "items-start"}`}>
             <a
-              href={launchInterestHref}
+              href={waitlistAnchorHref}
+              onClick={handleWaitlistCta("early-access")}
               className={`inline-flex items-center gap-3 rounded-[1.4rem] border border-white/12 bg-white/5 px-5 py-4 text-sm text-white/78 transition hover:border-[#BFA044]/50 hover:text-white ${
                 isArabic ? "flex-row-reverse" : ""
               }`}
