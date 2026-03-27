@@ -475,6 +475,8 @@ function serializeWaitlistContact(doc) {
     interest: readString(data.interest) || null,
     locale: readString(data.locale) || null,
     status: readString(data.status) || null,
+    archivedAt: timestampToISOString(data.archivedAt),
+    archivedReason: readString(data.archivedReason) || null,
     source: readString(data.source) || null,
     sourceOrigin: readString(data.sourceOrigin) || null,
     notes: readString(data.notes),
@@ -524,6 +526,8 @@ function buildWaitlistCsv(contacts) {
     'interest',
     'locale',
     'status',
+    'archivedAt',
+    'archivedReason',
     'source',
     'sourceOrigin',
     'submissionCount',
@@ -595,6 +599,122 @@ async function readWaitlistTotalCount() {
   } catch {
     return null;
   }
+}
+
+function parseWaitlistAdminContactAction(body) {
+  const action = normalizeSingleLine(body?.action, 20).toLowerCase();
+  const email = normalizeSingleLine(body?.email, 160).toLowerCase();
+  const contactId = normalizeSingleLine(body?.contactId, 160);
+  const reason = normalizeLongText(body?.reason, 300);
+  const confirm = normalizeSingleLine(body?.confirm, 20).toLowerCase();
+  const deleteEvents = typeof body?.deleteEvents === 'boolean' ? body.deleteEvents : true;
+
+  if (action !== 'archive' && action !== 'delete') {
+    return { ok: false, status: 400, error: 'invalid_admin_action' };
+  }
+
+  if (!contactId && !email) {
+    return { ok: false, status: 400, error: 'missing_contact_reference' };
+  }
+
+  if (email && !isValidEmail(email)) {
+    return { ok: false, status: 400, error: 'invalid_email' };
+  }
+
+  if (action === 'delete' && confirm !== 'delete') {
+    return { ok: false, status: 400, error: 'delete_confirmation_required' };
+  }
+
+  return {
+    ok: true,
+    data: {
+      action,
+      email,
+      contactId: contactId || buildWaitlistDocumentId(email),
+      reason,
+      deleteEvents,
+    },
+  };
+}
+
+function createWaitlistContactNotFoundError(contactId) {
+  const error = new Error(`waitlist contact not found: ${contactId}`);
+  error.code = 'waitlist_contact_not_found';
+  return error;
+}
+
+async function loadWaitlistContactForAdminAction(actionInput) {
+  const contactRef = admin.firestore().collection('landing_waitlist_contacts').doc(actionInput.contactId);
+  const contactSnapshot = await contactRef.get();
+
+  if (!contactSnapshot.exists) {
+    throw createWaitlistContactNotFoundError(actionInput.contactId);
+  }
+
+  return {
+    contactRef,
+    contactSnapshot,
+  };
+}
+
+async function archiveWaitlistContact(actionInput) {
+  const { contactRef, contactSnapshot } = await loadWaitlistContactForAdminAction(actionInput);
+  const previousContact = serializeWaitlistContact(contactSnapshot);
+  const payload = {
+    status: 'archived',
+    archivedAt: admin.firestore.FieldValue.serverTimestamp(),
+  };
+
+  if (actionInput.reason) {
+    payload.archivedReason = actionInput.reason;
+  }
+
+  await contactRef.set(payload, { merge: true });
+
+  return {
+    contactId: contactRef.id,
+    previousContact,
+    contact: serializeWaitlistContact(await contactRef.get()),
+  };
+}
+
+async function deleteWaitlistEventsForContact(contactId) {
+  const eventsRef = admin.firestore().collection('landing_waitlist_events');
+  let deletedEventCount = 0;
+
+  while (true) {
+    const snapshot = await eventsRef.where('contactId', '==', contactId).limit(400).get();
+    if (snapshot.empty) return deletedEventCount;
+
+    const batch = admin.firestore().batch();
+    for (const doc of snapshot.docs) {
+      batch.delete(doc.ref);
+    }
+    await batch.commit();
+    deletedEventCount += snapshot.docs.length;
+
+    if (snapshot.docs.length < 400) {
+      return deletedEventCount;
+    }
+  }
+}
+
+async function deleteWaitlistContact(actionInput) {
+  const { contactRef, contactSnapshot } = await loadWaitlistContactForAdminAction(actionInput);
+  const previousContact = serializeWaitlistContact(contactSnapshot);
+  let deletedEventCount = 0;
+
+  if (actionInput.deleteEvents) {
+    deletedEventCount = await deleteWaitlistEventsForContact(contactRef.id);
+  }
+
+  await contactRef.delete();
+
+  return {
+    contactId: contactRef.id,
+    previousContact,
+    deletedEventCount,
+  };
 }
 
 async function storeWaitlistLead(req, submission) {
@@ -975,10 +1095,51 @@ app.get('/waitlist/admin', authenticateWaitlistAdmin, async (req, res) => {
       contacts,
       counts,
       exportFormats: ['json', 'csv'],
+      contactActions: ['archive', 'delete'],
     });
   } catch (error) {
     console.error('[ai-proxy] Waitlist admin read failed:', error);
     return res.status(500).json({ error: 'waitlist_admin_read_failed' });
+  }
+});
+
+app.post('/waitlist/admin/contact', authenticateWaitlistAdmin, async (req, res) => {
+  if (!ensureFirebaseApp()) {
+    return res.status(500).json({ error: 'firebase_waitlist_not_configured' });
+  }
+
+  const parsed = parseWaitlistAdminContactAction(req.body);
+  if (!parsed.ok) {
+    return res.status(parsed.status).json({ error: parsed.error });
+  }
+
+  try {
+    if (parsed.data.action === 'archive') {
+      const result = await archiveWaitlistContact(parsed.data);
+      return res.json({
+        ok: true,
+        action: 'archive',
+        contactId: result.contactId,
+        previousContact: result.previousContact,
+        contact: result.contact,
+      });
+    }
+
+    const result = await deleteWaitlistContact(parsed.data);
+    return res.json({
+      ok: true,
+      action: 'delete',
+      contactId: result.contactId,
+      previousContact: result.previousContact,
+      deletedEventCount: result.deletedEventCount,
+    });
+  } catch (error) {
+    if (error?.code === 'waitlist_contact_not_found') {
+      return res.status(404).json({ error: error.code });
+    }
+
+    console.error('[ai-proxy] Waitlist admin mutation failed:', error);
+    return res.status(500).json({ error: 'waitlist_admin_mutation_failed' });
   }
 });
 

@@ -8,6 +8,7 @@ Small Express service that turns `AI Chat` and `MathScan` into managed backend f
 - Exposes `POST /ai/vision`
 - Exposes `POST /waitlist`
 - Exposes `GET /waitlist/admin`
+- Exposes `POST /waitlist/admin/contact`
 - Exposes `GET /waitlist/export`
 - Verifies Firebase ID tokens by default
 - Applies a simple in-memory rate limit
@@ -71,6 +72,18 @@ The waitlist admin endpoints are:
 ```bash
 curl -H "Authorization: Bearer $WAITLIST_ADMIN_TOKEN" \
   "http://localhost:3001/waitlist/admin?limit=50"
+
+curl -X POST \
+  -H "Authorization: Bearer $WAITLIST_ADMIN_TOKEN" \
+  -H "Content-Type: application/json" \
+  http://localhost:3001/waitlist/admin/contact \
+  -d '{"action":"archive","email":"lead@example.com","reason":"test cleanup"}'
+
+curl -X POST \
+  -H "Authorization: Bearer $WAITLIST_ADMIN_TOKEN" \
+  -H "Content-Type: application/json" \
+  http://localhost:3001/waitlist/admin/contact \
+  -d '{"action":"delete","email":"lead@example.com","confirm":"delete"}'
 
 curl -H "Authorization: Bearer $WAITLIST_ADMIN_TOKEN" \
   "http://localhost:3001/waitlist/export?format=csv&limit=500"
