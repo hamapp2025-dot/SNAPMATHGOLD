@@ -20,6 +20,15 @@ const WAITLIST_ALLOWED_INTERESTS = new Set([
   'semester-plan',
   'annual-plan',
 ]);
+const WAITLIST_ADMIN_ARCHIVE_REASON_PRESETS = [
+  { value: 'cleanup', label: 'Cleanup' },
+  { value: 'test signup', label: 'Test signup' },
+  { value: 'duplicate signup', label: 'Duplicate signup' },
+  { value: 'invalid contact details', label: 'Invalid contact details' },
+  { value: 'already handled offline', label: 'Already handled offline' },
+  { value: 'outside target audience', label: 'Outside target audience' },
+];
+const WAITLIST_ADMIN_QUERY_BATCH_LIMIT = 250;
 const WAITLIST_ALLOWED_ORIGINS = new Set([
   'https://snapmathacademy.com',
   'https://www.snapmathacademy.com',
@@ -574,22 +583,57 @@ function authenticateWaitlistAdmin(req, res, next) {
 
 async function loadWaitlistContactsForAdmin(req) {
   const limit = readBoundedInteger(req.query.limit, 100, 1, 1000);
-  const fetchLimit = Math.min(Math.max(limit * 4, limit), 2000);
+  const cursor = normalizeSingleLine(req.query.cursor, 200);
   const filters = {
     role: readQueryString(req.query.role).toLowerCase(),
     interest: readQueryString(req.query.interest).toLowerCase(),
     status: readQueryString(req.query.status).toLowerCase(),
     search: readQueryString(req.query.search).toLowerCase(),
   };
-  const snapshot = await admin
-    .firestore()
-    .collection('landing_waitlist_contacts')
-    .orderBy('lastSubmittedAt', 'desc')
-    .limit(fetchLimit)
-    .get();
+  const contactsRef = admin.firestore().collection('landing_waitlist_contacts');
+  const matchedContacts = [];
+  let query = contactsRef.orderBy('lastSubmittedAt', 'desc');
+  let lastBatchDoc = null;
 
-  const contacts = snapshot.docs.map(serializeWaitlistContact).filter((contact) => matchesWaitlistFilters(contact, filters));
-  return { contacts: contacts.slice(0, limit), filters, limit };
+  if (cursor) {
+    const cursorSnapshot = await contactsRef.doc(cursor).get();
+    if (!cursorSnapshot.exists) {
+      const error = new Error(`invalid waitlist admin cursor: ${cursor}`);
+      error.code = 'invalid_waitlist_admin_cursor';
+      throw error;
+    }
+    query = query.startAfter(cursorSnapshot);
+  }
+
+  while (matchedContacts.length < limit + 1) {
+    const snapshot = await query.limit(WAITLIST_ADMIN_QUERY_BATCH_LIMIT).get();
+    if (snapshot.empty) break;
+
+    for (const doc of snapshot.docs) {
+      lastBatchDoc = doc;
+      const contact = serializeWaitlistContact(doc);
+      if (!matchesWaitlistFilters(contact, filters)) continue;
+
+      matchedContacts.push(contact);
+      if (matchedContacts.length >= limit + 1) break;
+    }
+
+    if (matchedContacts.length >= limit + 1 || snapshot.docs.length < WAITLIST_ADMIN_QUERY_BATCH_LIMIT) {
+      break;
+    }
+
+    query = contactsRef.orderBy('lastSubmittedAt', 'desc').startAfter(lastBatchDoc);
+  }
+
+  const contacts = matchedContacts.slice(0, limit);
+  return {
+    contacts,
+    filters,
+    limit,
+    cursor: cursor || null,
+    hasNextPage: matchedContacts.length > limit,
+    nextCursor: matchedContacts.length > limit && contacts.length > 0 ? contacts[contacts.length - 1].id : null,
+  };
 }
 
 async function readWaitlistTotalCount() {
@@ -720,6 +764,7 @@ async function deleteWaitlistContact(actionInput) {
 function buildWaitlistAdminUiHtml() {
   const roleOptionsJson = JSON.stringify(Array.from(WAITLIST_ALLOWED_ROLES));
   const interestOptionsJson = JSON.stringify(Array.from(WAITLIST_ALLOWED_INTERESTS));
+  const archiveReasonPresetsJson = JSON.stringify(WAITLIST_ADMIN_ARCHIVE_REASON_PRESETS);
 
   return String.raw`<!DOCTYPE html>
 <html lang="en">
@@ -964,7 +1009,33 @@ function buildWaitlistAdminUiHtml() {
         color: #ffd9d2;
       }
 
+      .results-bar {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        align-items: center;
+        gap: 14px;
+      }
+
       .results-meta {
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .pagination-controls {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .pagination-controls button {
+        min-height: 36px;
+        padding: 0 14px;
+      }
+
+      .page-summary {
+        min-width: 78px;
+        text-align: center;
         color: var(--muted);
         font-size: 13px;
       }
@@ -1082,11 +1153,34 @@ function buildWaitlistAdminUiHtml() {
         display: flex;
         flex-direction: column;
         gap: 10px;
-        min-width: 150px;
+        min-width: 190px;
       }
 
       .row-actions button {
         width: 100%;
+      }
+
+      .action-field {
+        display: grid;
+        gap: 6px;
+      }
+
+      .action-field span {
+        color: var(--muted);
+        font-size: 11px;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+      }
+
+      .action-field select {
+        width: 100%;
+        min-height: 36px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 10px;
+        background: rgba(255, 255, 255, 0.04);
+        color: var(--text);
+        padding: 0 10px;
+        font-size: 13px;
       }
 
       .row-actions .danger {
@@ -1229,7 +1323,14 @@ function buildWaitlistAdminUiHtml() {
         </section>
 
         <div id="message" class="message" role="status" aria-live="polite"></div>
-        <div id="results-meta" class="results-meta">Enter an admin token, then load contacts.</div>
+        <div class="results-bar">
+          <div id="results-meta" class="results-meta">Enter an admin token, then load contacts.</div>
+          <div class="pagination-controls">
+            <button id="previous-page-button" class="ghost-button" type="button">Previous</button>
+            <span id="page-summary" class="page-summary">Page 1</span>
+            <button id="next-page-button" class="ghost-button" type="button">Next</button>
+          </div>
+        </div>
 
         <section class="panel table-shell">
           <div class="table-wrap">
@@ -1261,7 +1362,9 @@ function buildWaitlistAdminUiHtml() {
     <script>
       const ROLE_OPTIONS = ${roleOptionsJson};
       const INTEREST_OPTIONS = ${interestOptionsJson};
+      const ARCHIVE_REASON_PRESETS = ${archiveReasonPresetsJson};
       const STATUS_OPTIONS = ["", "new", "archived"];
+      const CUSTOM_ARCHIVE_REASON_VALUE = "__custom__";
       const ROLE_LABELS = {
         student: "Student",
         parent: "Parent",
@@ -1296,6 +1399,9 @@ function buildWaitlistAdminUiHtml() {
         filtersForm: document.getElementById("filters-form"),
         message: document.getElementById("message"),
         resultsMeta: document.getElementById("results-meta"),
+        previousPageButton: document.getElementById("previous-page-button"),
+        nextPageButton: document.getElementById("next-page-button"),
+        pageSummary: document.getElementById("page-summary"),
         contactsBody: document.getElementById("contacts-body"),
         totalContacts: document.getElementById("total-contacts"),
         returnedContacts: document.getElementById("returned-contacts"),
@@ -1305,6 +1411,9 @@ function buildWaitlistAdminUiHtml() {
 
       const state = {
         loading: false,
+        currentCursor: "",
+        previousCursors: [],
+        nextCursor: null,
       };
 
       function escapeHtml(value) {
@@ -1326,6 +1435,22 @@ function buildWaitlistAdminUiHtml() {
         elements.message.textContent = "";
       }
 
+      function resetPaging() {
+        state.currentCursor = "";
+        state.previousCursors = [];
+        state.nextCursor = null;
+      }
+
+      function getCurrentPageNumber() {
+        return state.previousCursors.length + 1;
+      }
+
+      function syncPaginationControls() {
+        elements.previousPageButton.disabled = state.loading || state.previousCursors.length === 0;
+        elements.nextPageButton.disabled = state.loading || !state.nextCursor;
+        elements.pageSummary.textContent = "Page " + getCurrentPageNumber();
+      }
+
       function setLoading(loading) {
         state.loading = loading;
         elements.loadButton.disabled = loading;
@@ -1337,6 +1462,7 @@ function buildWaitlistAdminUiHtml() {
         Array.from(document.querySelectorAll("[data-contact-action]")).forEach(function (button) {
           button.disabled = loading;
         });
+        syncPaginationControls();
       }
 
       function readToken() {
@@ -1466,15 +1592,39 @@ function buildWaitlistAdminUiHtml() {
         elements.resultsMeta.textContent =
           "Showing " +
           formatNumber(data.returnedContacts) +
-          " of " +
+          " contacts on page " +
+          formatNumber(getCurrentPageNumber()) +
+          ". Total waitlist size: " +
           formatNumber(data.totalContacts) +
-          " contacts. Limit " +
-          formatNumber(data.limit) +
           ".";
+      }
+
+      function renderPagination(data) {
+        const pagination = data.pagination || {};
+        state.nextCursor = pagination.hasNextPage ? (pagination.nextCursor || null) : null;
+        syncPaginationControls();
       }
 
       function buildBadge(label, className) {
         return '<span class="badge ' + className + '">' + escapeHtml(label) + "</span>";
+      }
+
+      function buildArchiveReasonOptionsHtml() {
+        const options = ARCHIVE_REASON_PRESETS.map(function (item) {
+          return (
+            '<option value="' +
+            escapeHtml(item.value) +
+            '">' +
+            escapeHtml(item.label) +
+            "</option>"
+          );
+        });
+        options.push(
+          '<option value="' +
+            CUSTOM_ARCHIVE_REASON_VALUE +
+            '">Custom reason...</option>'
+        );
+        return options.join("");
       }
 
       function renderStatusBadges(contact) {
@@ -1510,6 +1660,14 @@ function buildWaitlistAdminUiHtml() {
 
         const actionButtons = [];
         if (contact.status !== "archived") {
+          actionButtons.push(
+            '<label class="action-field">' +
+              "<span>Archive reason</span>" +
+              '<select data-archive-reason>' +
+                buildArchiveReasonOptionsHtml() +
+              "</select>" +
+            "</label>"
+          );
           actionButtons.push(
             '<button type="button" data-contact-action="archive" data-contact-id="' +
               escapeHtml(contact.id) +
@@ -1571,24 +1729,68 @@ function buildWaitlistAdminUiHtml() {
       }
 
       async function loadContacts(options) {
-        const config = Object.assign({ silent: false }, options || {});
+        const config = Object.assign({ silent: false, resetPaging: false }, options || {});
         clearMessage();
         saveTokenToSession();
+
+        if (config.resetPaging) {
+          resetPaging();
+        }
+
         setLoading(true);
 
         try {
           const filters = readFilters();
-          const query = buildQueryString(filters);
+          const query = buildQueryString(
+            Object.assign({}, filters, state.currentCursor ? { cursor: state.currentCursor } : {})
+          );
           const data = await apiFetchJson("/waitlist/admin" + (query ? "?" + query : ""));
           renderSummary(data);
+          renderPagination(data);
           renderContacts(data.contacts || []);
           if (!config.silent) {
             setMessage("success", "Loaded " + formatNumber(data.returnedContacts) + " waitlist contacts.");
           }
+          return true;
         } catch (error) {
+          state.nextCursor = null;
+          syncPaginationControls();
           setMessage("error", error.message || "Could not load waitlist contacts.");
+          return false;
         } finally {
           setLoading(false);
+        }
+      }
+
+      async function goToNextPage() {
+        if (!state.nextCursor || state.loading) return;
+
+        const previousCursor = state.currentCursor;
+        state.previousCursors.push(previousCursor);
+        state.currentCursor = state.nextCursor;
+        syncPaginationControls();
+
+        const ok = await loadContacts({ silent: true });
+        if (!ok) {
+          state.currentCursor = previousCursor;
+          state.previousCursors.pop();
+          syncPaginationControls();
+        }
+      }
+
+      async function goToPreviousPage() {
+        if (state.previousCursors.length === 0 || state.loading) return;
+
+        const previousCursors = state.previousCursors.slice();
+        const previousCursor = state.currentCursor;
+        state.currentCursor = state.previousCursors.pop() || "";
+        syncPaginationControls();
+
+        const ok = await loadContacts({ silent: true });
+        if (!ok) {
+          state.previousCursors = previousCursors;
+          state.currentCursor = previousCursor;
+          syncPaginationControls();
         }
       }
 
@@ -1643,6 +1845,7 @@ function buildWaitlistAdminUiHtml() {
         const action = button.getAttribute("data-contact-action");
         const contactId = button.getAttribute("data-contact-id");
         const email = button.getAttribute("data-contact-email") || "";
+        const actionContainer = button.closest(".row-actions");
 
         if (!action || !contactId) return;
 
@@ -1653,9 +1856,16 @@ function buildWaitlistAdminUiHtml() {
         };
 
         if (action === "archive") {
-          const reason = window.prompt("Archive reason (optional)", "cleanup");
-          if (reason === null) return;
-          payload.reason = reason.trim();
+          const reasonSelect = actionContainer ? actionContainer.querySelector("[data-archive-reason]") : null;
+          const presetReason = reasonSelect ? reasonSelect.value : "";
+
+          if (presetReason === CUSTOM_ARCHIVE_REASON_VALUE) {
+            const customReason = window.prompt("Archive reason", "cleanup");
+            if (customReason === null) return;
+            payload.reason = customReason.trim();
+          } else {
+            payload.reason = presetReason.trim();
+          }
         }
 
         if (action === "delete") {
@@ -1705,14 +1915,16 @@ function buildWaitlistAdminUiHtml() {
         });
 
         loadTokenFromSession();
+        resetPaging();
+        syncPaginationControls();
 
         elements.filtersForm.addEventListener("submit", function (event) {
           event.preventDefault();
-          loadContacts();
+          loadContacts({ resetPaging: true });
         });
 
         elements.loadButton.addEventListener("click", function () {
-          loadContacts();
+          loadContacts({ resetPaging: true });
         });
 
         elements.exportJsonButton.addEventListener("click", function () {
@@ -1725,11 +1937,13 @@ function buildWaitlistAdminUiHtml() {
 
         elements.forgetTokenButton.addEventListener("click", function () {
           clearTokenFromSession();
+          resetPaging();
           elements.totalContacts.textContent = "-";
           elements.returnedContacts.textContent = "-";
           elements.emailReady.textContent = "-";
           elements.searchSummary.textContent = "All";
           elements.resultsMeta.textContent = "Token cleared. Paste it again to load contacts.";
+          syncPaginationControls();
           elements.contactsBody.innerHTML =
             '<tr><td colspan="6" class="empty-state"><strong>Token removed.</strong>Paste it again to load contacts.</td></tr>';
           clearMessage();
@@ -1737,12 +1951,20 @@ function buildWaitlistAdminUiHtml() {
 
         elements.resetFiltersButton.addEventListener("click", function () {
           resetFilters();
+          resetPaging();
+          syncPaginationControls();
         });
 
         elements.tokenInput.addEventListener("change", saveTokenToSession);
+        elements.previousPageButton.addEventListener("click", function () {
+          goToPreviousPage();
+        });
+        elements.nextPageButton.addEventListener("click", function () {
+          goToNextPage();
+        });
 
         if (readToken()) {
-          loadContacts({ silent: true });
+          loadContacts({ silent: true, resetPaging: true });
         }
       }
 
@@ -2118,7 +2340,7 @@ app.get('/waitlist/admin', authenticateWaitlistAdmin, async (req, res) => {
   }
 
   try {
-    const [{ contacts, filters, limit }, totalContacts] = await Promise.all([
+    const [{ contacts, filters, limit, cursor, nextCursor, hasNextPage }, totalContacts] = await Promise.all([
       loadWaitlistContactsForAdmin(req),
       readWaitlistTotalCount(),
     ]);
@@ -2146,10 +2368,20 @@ app.get('/waitlist/admin', authenticateWaitlistAdmin, async (req, res) => {
       waitlistEmailReady: isWaitlistEmailReady(),
       contacts,
       counts,
+      archiveReasonPresets: WAITLIST_ADMIN_ARCHIVE_REASON_PRESETS,
+      pagination: {
+        cursor,
+        nextCursor,
+        hasNextPage,
+      },
       exportFormats: ['json', 'csv'],
       contactActions: ['archive', 'delete'],
     });
   } catch (error) {
+    if (error?.code === 'invalid_waitlist_admin_cursor') {
+      return res.status(400).json({ error: error.code });
+    }
+
     console.error('[ai-proxy] Waitlist admin read failed:', error);
     return res.status(500).json({ error: 'waitlist_admin_read_failed' });
   }

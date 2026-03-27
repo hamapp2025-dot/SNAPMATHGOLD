@@ -96,7 +96,7 @@ The admin browser UI is:
 open "http://localhost:3001/waitlist/admin/ui"
 ```
 
-Paste `WAITLIST_ADMIN_TOKEN` into the UI to search, export, archive, or delete waitlist contacts without using raw API calls.
+Paste `WAITLIST_ADMIN_TOKEN` into the UI to search, page through results, export, archive with preset reasons, or delete waitlist contacts without using raw API calls.
 
 ## Render deployment
 
