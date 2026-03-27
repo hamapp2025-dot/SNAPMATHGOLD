@@ -622,9 +622,15 @@ export function SnapMathLanding() {
       successNew: isArabic
         ? "تم تسجيلك بنجاح. سنراسلك أول ما نفتح الوصول."
         : "You are on the list. We will contact you as soon as access opens.",
+      successNewEmailSent: isArabic
+        ? "تم تسجيلك بنجاح. تحقق من بريدك الإلكتروني لتجد رسالة التأكيد والخطوات التالية."
+        : "You are on the list. Check your email for your confirmation and next steps.",
       successExisting: isArabic
         ? "أنت مسجل بالفعل. حدّثنا تفضيلاتك وسنستمر بإرسال أحدث أخبار الإطلاق."
         : "You were already on the list. We updated your preferences and will keep you posted.",
+      successExistingEmailSent: isArabic
+        ? "أنت مسجل بالفعل. حدّثنا تفضيلاتك، ويمكنك مراجعة بريدك الإلكتروني لرسالة التأكيد."
+        : "You were already on the list. We updated your preferences, and your confirmation email is in your inbox.",
       error: isArabic
         ? "تعذر إرسال الطلب الآن. جرّب مرة أخرى أو راسلنا مباشرة على hello@snapmathacademy.com"
         : "We could not submit right now. Please try again or email us directly at hello@snapmathacademy.com.",
@@ -704,15 +710,30 @@ export function SnapMathLanding() {
         }),
       });
       const payload = (await response.json().catch(() => null)) as
-        | { duplicate?: boolean; error?: string }
+        | {
+            duplicate?: boolean;
+            error?: string;
+            confirmationEmail?: "sent" | "failed" | "skipped" | "already-sent";
+          }
         | null;
 
       if (!response.ok) {
         throw new Error(payload?.error || "waitlist-submit-failed");
       }
 
+      const confirmationDelivered =
+        payload?.confirmationEmail === "sent" || payload?.confirmationEmail === "already-sent";
+
       setWaitlistState("success");
-      setWaitlistMessage(payload?.duplicate ? waitlistCopy.successExisting : waitlistCopy.successNew);
+      setWaitlistMessage(
+        payload?.duplicate
+          ? confirmationDelivered
+            ? waitlistCopy.successExistingEmailSent
+            : waitlistCopy.successExisting
+          : payload?.confirmationEmail === "sent"
+            ? waitlistCopy.successNewEmailSent
+            : waitlistCopy.successNew
+      );
       setWaitlistForm(emptyWaitlistForm);
     } catch (error) {
       setWaitlistState("error");
