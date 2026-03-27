@@ -10,6 +10,7 @@ Small Express service that turns `AI Chat` and `MathScan` into managed backend f
 - Exposes `GET /waitlist/admin`
 - Exposes `GET /waitlist/admin/ui`
 - Exposes `POST /waitlist/admin/contact`
+- Exposes `POST /waitlist/admin/bulk`
 - Exposes `GET /waitlist/export`
 - Verifies Firebase ID tokens by default
 - Applies a simple in-memory rate limit
@@ -86,6 +87,18 @@ curl -X POST \
   http://localhost:3001/waitlist/admin/contact \
   -d '{"action":"delete","email":"lead@example.com","confirm":"delete"}'
 
+curl -X POST \
+  -H "Authorization: Bearer $WAITLIST_ADMIN_TOKEN" \
+  -H "Content-Type: application/json" \
+  http://localhost:3001/waitlist/admin/bulk \
+  -d '{"action":"archive","contactIds":["YUBjLmNvbQ","YmJAZXhhbXBsZS5jb20"],"reason":"duplicate signup"}'
+
+curl -X POST \
+  -H "Authorization: Bearer $WAITLIST_ADMIN_TOKEN" \
+  -H "Content-Type: application/json" \
+  http://localhost:3001/waitlist/admin/bulk \
+  -d '{"action":"delete","contactIds":["YUBjLmNvbQ","YmJAZXhhbXBsZS5jb20"],"confirm":"delete"}'
+
 curl -H "Authorization: Bearer $WAITLIST_ADMIN_TOKEN" \
   "http://localhost:3001/waitlist/export?format=csv&limit=500"
 ```
@@ -96,7 +109,7 @@ The admin browser UI is:
 open "http://localhost:3001/waitlist/admin/ui"
 ```
 
-Paste `WAITLIST_ADMIN_TOKEN` into the UI to search, page through results, export, archive with preset reasons, or delete waitlist contacts without using raw API calls.
+Paste `WAITLIST_ADMIN_TOKEN` into the UI to search, page through results, export, archive with preset reasons, or bulk archive/delete waitlist contacts without using raw API calls.
 
 ## Render deployment
 

@@ -28,6 +28,7 @@ const WAITLIST_ADMIN_ARCHIVE_REASON_PRESETS = [
   { value: 'already handled offline', label: 'Already handled offline' },
   { value: 'outside target audience', label: 'Outside target audience' },
 ];
+const WAITLIST_ADMIN_BULK_MAX_CONTACTS = 100;
 const WAITLIST_ADMIN_QUERY_BATCH_LIMIT = 250;
 const WAITLIST_ALLOWED_ORIGINS = new Set([
   'https://snapmathacademy.com',
@@ -681,6 +682,47 @@ function parseWaitlistAdminContactAction(body) {
   };
 }
 
+function parseWaitlistAdminBulkAction(body) {
+  const action = normalizeSingleLine(body?.action, 20).toLowerCase();
+  const reason = normalizeLongText(body?.reason, 300);
+  const confirm = normalizeSingleLine(body?.confirm, 20).toLowerCase();
+  const deleteEvents = typeof body?.deleteEvents === 'boolean' ? body.deleteEvents : true;
+  const rawContactIds = Array.isArray(body?.contactIds) ? body.contactIds : [];
+  const contactIds = Array.from(
+    new Set(
+      rawContactIds
+        .map((value) => normalizeSingleLine(value, 160))
+        .filter(Boolean),
+    ),
+  );
+
+  if (action !== 'archive' && action !== 'delete') {
+    return { ok: false, status: 400, error: 'invalid_admin_action' };
+  }
+
+  if (contactIds.length === 0) {
+    return { ok: false, status: 400, error: 'missing_contact_references' };
+  }
+
+  if (contactIds.length > WAITLIST_ADMIN_BULK_MAX_CONTACTS) {
+    return { ok: false, status: 400, error: 'too_many_contact_references' };
+  }
+
+  if (action === 'delete' && confirm !== 'delete') {
+    return { ok: false, status: 400, error: 'delete_confirmation_required' };
+  }
+
+  return {
+    ok: true,
+    data: {
+      action,
+      contactIds,
+      reason,
+      deleteEvents,
+    },
+  };
+}
+
 function createWaitlistContactNotFoundError(contactId) {
   const error = new Error(`waitlist contact not found: ${contactId}`);
   error.code = 'waitlist_contact_not_found';
@@ -758,6 +800,71 @@ async function deleteWaitlistContact(actionInput) {
     contactId: contactRef.id,
     previousContact,
     deletedEventCount,
+  };
+}
+
+async function runWaitlistAdminAction(actionInput) {
+  if (actionInput.action === 'archive') {
+    const result = await archiveWaitlistContact(actionInput);
+    return {
+      action: 'archive',
+      contactId: result.contactId,
+      previousContact: result.previousContact,
+      contact: result.contact,
+    };
+  }
+
+  const result = await deleteWaitlistContact(actionInput);
+  return {
+    action: 'delete',
+    contactId: result.contactId,
+    previousContact: result.previousContact,
+    deletedEventCount: result.deletedEventCount,
+  };
+}
+
+async function runWaitlistAdminBulkAction(actionInput) {
+  const results = [];
+  let successCount = 0;
+  let failureCount = 0;
+  let deletedEventCount = 0;
+
+  for (const contactId of actionInput.contactIds) {
+    try {
+      const result = await runWaitlistAdminAction({
+        action: actionInput.action,
+        contactId,
+        reason: actionInput.reason,
+        deleteEvents: actionInput.deleteEvents,
+      });
+
+      successCount += 1;
+      deletedEventCount += Number(result.deletedEventCount || 0);
+      results.push({
+        ok: true,
+        action: result.action,
+        contactId: result.contactId,
+        email: result.contact?.email || result.previousContact?.email || null,
+        deletedEventCount: Number(result.deletedEventCount || 0),
+      });
+    } catch (error) {
+      failureCount += 1;
+      results.push({
+        ok: false,
+        action: actionInput.action,
+        contactId,
+        error: error?.code === 'waitlist_contact_not_found' ? error.code : 'waitlist_admin_mutation_failed',
+      });
+    }
+  }
+
+  return {
+    action: actionInput.action,
+    requestedCount: actionInput.contactIds.length,
+    successCount,
+    failureCount,
+    deletedEventCount,
+    results,
   };
 }
 
@@ -1009,6 +1116,12 @@ function buildWaitlistAdminUiHtml() {
         color: #ffd9d2;
       }
 
+      .message.warning {
+        background: rgba(245, 195, 91, 0.12);
+        border-color: rgba(245, 195, 91, 0.24);
+        color: #f7e4b2;
+      }
+
       .results-bar {
         display: flex;
         flex-wrap: wrap;
@@ -1038,6 +1151,41 @@ function buildWaitlistAdminUiHtml() {
         text-align: center;
         color: var(--muted);
         font-size: 13px;
+      }
+
+      .bulk-panel {
+        padding: 18px 20px;
+      }
+
+      .bulk-panel-content {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        align-items: center;
+        gap: 16px;
+      }
+
+      .bulk-count {
+        display: block;
+        font-size: 16px;
+        font-weight: 700;
+      }
+
+      .bulk-actions {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: end;
+        gap: 10px;
+      }
+
+      .bulk-reason-field {
+        min-width: 220px;
+      }
+
+      .danger-button {
+        border-color: rgba(239, 106, 91, 0.22);
+        background: rgba(239, 106, 91, 0.12);
+        color: #ffd9d2;
       }
 
       .table-shell {
@@ -1081,6 +1229,18 @@ function buildWaitlistAdminUiHtml() {
       .lead-name {
         font-weight: 700;
         margin-bottom: 6px;
+      }
+
+      .selection-cell {
+        width: 56px;
+        text-align: center;
+      }
+
+      .selection-checkbox {
+        width: 18px;
+        height: 18px;
+        accent-color: var(--accent);
+        cursor: pointer;
       }
 
       .lead-secondary,
@@ -1332,11 +1492,31 @@ function buildWaitlistAdminUiHtml() {
           </div>
         </div>
 
+        <section class="panel bulk-panel">
+          <div class="bulk-panel-content">
+            <div>
+              <strong id="selected-count" class="bulk-count">0 leads selected</strong>
+              <p class="hint">Selections stay active while you move between pages in this browser tab.</p>
+            </div>
+            <div class="bulk-actions">
+              <button id="select-page-button" class="ghost-button" type="button">Select Page</button>
+              <button id="clear-selection-button" class="ghost-button" type="button">Clear Selection</button>
+              <label class="field bulk-reason-field">
+                <span>Bulk Archive Reason</span>
+                <select id="bulk-archive-reason"></select>
+              </label>
+              <button id="bulk-archive-button" class="secondary-button" type="button">Archive Selected</button>
+              <button id="bulk-delete-button" class="danger-button" type="button">Delete Selected</button>
+            </div>
+          </div>
+        </section>
+
         <section class="panel table-shell">
           <div class="table-wrap">
             <table>
               <thead>
                 <tr>
+                  <th class="selection-cell">Select</th>
                   <th>Lead</th>
                   <th>Details</th>
                   <th>Status</th>
@@ -1347,7 +1527,7 @@ function buildWaitlistAdminUiHtml() {
               </thead>
               <tbody id="contacts-body">
                 <tr>
-                  <td colspan="6" class="empty-state">
+                  <td colspan="7" class="empty-state">
                     <strong>No data loaded yet.</strong>
                     Paste the admin token and click <em>Load Contacts</em>.
                   </td>
@@ -1402,6 +1582,12 @@ function buildWaitlistAdminUiHtml() {
         previousPageButton: document.getElementById("previous-page-button"),
         nextPageButton: document.getElementById("next-page-button"),
         pageSummary: document.getElementById("page-summary"),
+        selectedCount: document.getElementById("selected-count"),
+        selectPageButton: document.getElementById("select-page-button"),
+        clearSelectionButton: document.getElementById("clear-selection-button"),
+        bulkArchiveReasonSelect: document.getElementById("bulk-archive-reason"),
+        bulkArchiveButton: document.getElementById("bulk-archive-button"),
+        bulkDeleteButton: document.getElementById("bulk-delete-button"),
         contactsBody: document.getElementById("contacts-body"),
         totalContacts: document.getElementById("total-contacts"),
         returnedContacts: document.getElementById("returned-contacts"),
@@ -1414,6 +1600,8 @@ function buildWaitlistAdminUiHtml() {
         currentCursor: "",
         previousCursors: [],
         nextCursor: null,
+        currentPageContacts: [],
+        selectedContacts: new Map(),
       };
 
       function escapeHtml(value) {
@@ -1441,6 +1629,10 @@ function buildWaitlistAdminUiHtml() {
         state.nextCursor = null;
       }
 
+      function clearSelectedContacts() {
+        state.selectedContacts.clear();
+      }
+
       function getCurrentPageNumber() {
         return state.previousCursors.length + 1;
       }
@@ -1451,6 +1643,27 @@ function buildWaitlistAdminUiHtml() {
         elements.pageSummary.textContent = "Page " + getCurrentPageNumber();
       }
 
+      function areAllCurrentPageContactsSelected() {
+        return (
+          state.currentPageContacts.length > 0 &&
+          state.currentPageContacts.every(function (contact) {
+            return state.selectedContacts.has(contact.id);
+          })
+        );
+      }
+
+      function syncBulkControls() {
+        const selectedCount = state.selectedContacts.size;
+        elements.selectedCount.textContent =
+          formatNumber(selectedCount) + (selectedCount === 1 ? " lead selected" : " leads selected");
+        elements.selectPageButton.disabled = state.loading || state.currentPageContacts.length === 0;
+        elements.selectPageButton.textContent = areAllCurrentPageContactsSelected() ? "Unselect Page" : "Select Page";
+        elements.clearSelectionButton.disabled = state.loading || selectedCount === 0;
+        elements.bulkArchiveReasonSelect.disabled = state.loading || selectedCount === 0;
+        elements.bulkArchiveButton.disabled = state.loading || selectedCount === 0;
+        elements.bulkDeleteButton.disabled = state.loading || selectedCount === 0;
+      }
+
       function setLoading(loading) {
         state.loading = loading;
         elements.loadButton.disabled = loading;
@@ -1459,10 +1672,11 @@ function buildWaitlistAdminUiHtml() {
         elements.resetFiltersButton.disabled = loading;
         elements.forgetTokenButton.disabled = loading;
         elements.loadButton.textContent = loading ? "Loading..." : "Load Contacts";
-        Array.from(document.querySelectorAll("[data-contact-action]")).forEach(function (button) {
-          button.disabled = loading;
+        Array.from(document.querySelectorAll("[data-contact-action], [data-contact-select]")).forEach(function (element) {
+          element.disabled = loading;
         });
         syncPaginationControls();
+        syncBulkControls();
       }
 
       function readToken() {
@@ -1627,6 +1841,34 @@ function buildWaitlistAdminUiHtml() {
         return options.join("");
       }
 
+      function populateArchiveReasonSelect(select) {
+        select.innerHTML = buildArchiveReasonOptionsHtml();
+        if (ARCHIVE_REASON_PRESETS.length > 0) {
+          select.value = ARCHIVE_REASON_PRESETS[0].value;
+        }
+      }
+
+      function readArchiveReasonFromSelect(select, promptTitle) {
+        const selectedValue = select ? String(select.value || "").trim() : "";
+
+        if (selectedValue === CUSTOM_ARCHIVE_REASON_VALUE) {
+          const customReason = window.prompt(promptTitle, ARCHIVE_REASON_PRESETS[0]?.value || "cleanup");
+          if (customReason === null) {
+            return { cancelled: true, reason: "" };
+          }
+
+          return {
+            cancelled: false,
+            reason: customReason.trim(),
+          };
+        }
+
+        return {
+          cancelled: false,
+          reason: selectedValue,
+        };
+      }
+
       function renderStatusBadges(contact) {
         const badges = [];
         const statusClass = contact.status === "archived" ? "status-archived" : "status-new";
@@ -1686,6 +1928,13 @@ function buildWaitlistAdminUiHtml() {
 
         return (
           "<tr>" +
+            '<td class="selection-cell">' +
+              '<input type="checkbox" class="selection-checkbox" data-contact-select="' +
+                escapeHtml(contact.id) +
+                '"' +
+                (state.selectedContacts.has(contact.id) ? " checked" : "") +
+              " />" +
+            "</td>" +
             "<td>" +
               '<div class="lead-name">' + escapeHtml(contact.name || "Unnamed lead") + "</div>" +
               '<div class="lead-secondary">' + escapeHtml(contact.email || "—") + "</div>" +
@@ -1716,16 +1965,40 @@ function buildWaitlistAdminUiHtml() {
       function renderContacts(contacts) {
         if (!Array.isArray(contacts) || contacts.length === 0) {
           elements.contactsBody.innerHTML =
-            '<tr><td colspan="6" class="empty-state"><strong>No contacts matched these filters.</strong>Try a broader search or increase the limit.</td></tr>';
+            '<tr><td colspan="7" class="empty-state"><strong>No contacts matched these filters.</strong>Try a broader search or increase the limit.</td></tr>';
+          syncBulkControls();
           return;
         }
 
         elements.contactsBody.innerHTML = contacts.map(renderRow).join("");
+        Array.from(elements.contactsBody.querySelectorAll("[data-contact-select]")).forEach(function (checkbox) {
+          checkbox.addEventListener("change", function () {
+            const contactId = checkbox.getAttribute("data-contact-select");
+            const contact = state.currentPageContacts.find(function (item) {
+              return item.id === contactId;
+            });
+
+            if (!contact) return;
+
+            if (checkbox.checked) {
+              state.selectedContacts.set(contact.id, {
+                id: contact.id,
+                email: contact.email || null,
+                name: contact.name || null,
+              });
+            } else {
+              state.selectedContacts.delete(contact.id);
+            }
+
+            syncBulkControls();
+          });
+        });
         Array.from(elements.contactsBody.querySelectorAll("[data-contact-action]")).forEach(function (button) {
           button.addEventListener("click", function () {
             handleContactAction(button);
           });
         });
+        syncBulkControls();
       }
 
       async function loadContacts(options) {
@@ -1735,6 +2008,7 @@ function buildWaitlistAdminUiHtml() {
 
         if (config.resetPaging) {
           resetPaging();
+          clearSelectedContacts();
         }
 
         setLoading(true);
@@ -1745,9 +2019,10 @@ function buildWaitlistAdminUiHtml() {
             Object.assign({}, filters, state.currentCursor ? { cursor: state.currentCursor } : {})
           );
           const data = await apiFetchJson("/waitlist/admin" + (query ? "?" + query : ""));
+          state.currentPageContacts = Array.isArray(data.contacts) ? data.contacts : [];
           renderSummary(data);
           renderPagination(data);
-          renderContacts(data.contacts || []);
+          renderContacts(state.currentPageContacts);
           if (!config.silent) {
             setMessage("success", "Loaded " + formatNumber(data.returnedContacts) + " waitlist contacts.");
           }
@@ -1792,6 +2067,24 @@ function buildWaitlistAdminUiHtml() {
           state.currentCursor = previousCursor;
           syncPaginationControls();
         }
+      }
+
+      function toggleCurrentPageSelection() {
+        const shouldSelect = !areAllCurrentPageContactsSelected();
+
+        state.currentPageContacts.forEach(function (contact) {
+          if (shouldSelect) {
+            state.selectedContacts.set(contact.id, {
+              id: contact.id,
+              email: contact.email || null,
+              name: contact.name || null,
+            });
+          } else {
+            state.selectedContacts.delete(contact.id);
+          }
+        });
+
+        renderContacts(state.currentPageContacts);
       }
 
       async function exportContacts(format) {
@@ -1841,6 +2134,81 @@ function buildWaitlistAdminUiHtml() {
         }
       }
 
+      async function handleBulkAction(action) {
+        const selectedContacts = Array.from(state.selectedContacts.values());
+        if (selectedContacts.length === 0) return;
+
+        let payload = {
+          action: action,
+          contactIds: selectedContacts.map(function (contact) {
+            return contact.id;
+          }),
+        };
+
+        if (action === "archive") {
+          const reasonResult = readArchiveReasonFromSelect(
+            elements.bulkArchiveReasonSelect,
+            "Bulk archive reason"
+          );
+          if (reasonResult.cancelled) return;
+          payload.reason = reasonResult.reason;
+        }
+
+        if (action === "delete") {
+          const confirmed = window.confirm(
+            "Delete " +
+              formatNumber(selectedContacts.length) +
+              " selected contacts and their waitlist event history?"
+          );
+          if (!confirmed) return;
+          payload.confirm = "delete";
+        }
+
+        clearMessage();
+        setLoading(true);
+
+        try {
+          const data = await apiFetchJson("/waitlist/admin/bulk", {
+            method: "POST",
+            body: JSON.stringify(payload),
+          });
+
+          (data.results || []).forEach(function (result) {
+            if (result && result.ok && result.contactId) {
+              state.selectedContacts.delete(result.contactId);
+            }
+          });
+
+          const messageKind =
+            data.failureCount > 0
+              ? (Number(data.successCount || 0) > 0 ? "warning" : "error")
+              : "success";
+
+          let messageText = "";
+          if (action === "archive") {
+            messageText = "Archived " + formatNumber(data.successCount || 0) + " selected contacts.";
+          } else {
+            messageText =
+              "Deleted " +
+              formatNumber(data.successCount || 0) +
+              " selected contacts and removed " +
+              formatNumber(data.deletedEventCount || 0) +
+              " linked event records.";
+          }
+
+          if (data.failureCount > 0) {
+            messageText += " " + formatNumber(data.failureCount) + " failed.";
+          }
+
+          await loadContacts({ silent: true });
+          setMessage(messageKind, messageText);
+        } catch (error) {
+          setMessage("error", error.message || "Could not update the selected contacts.");
+        } finally {
+          setLoading(false);
+        }
+      }
+
       async function handleContactAction(button) {
         const action = button.getAttribute("data-contact-action");
         const contactId = button.getAttribute("data-contact-id");
@@ -1857,15 +2225,9 @@ function buildWaitlistAdminUiHtml() {
 
         if (action === "archive") {
           const reasonSelect = actionContainer ? actionContainer.querySelector("[data-archive-reason]") : null;
-          const presetReason = reasonSelect ? reasonSelect.value : "";
-
-          if (presetReason === CUSTOM_ARCHIVE_REASON_VALUE) {
-            const customReason = window.prompt("Archive reason", "cleanup");
-            if (customReason === null) return;
-            payload.reason = customReason.trim();
-          } else {
-            payload.reason = presetReason.trim();
-          }
+          const reasonResult = readArchiveReasonFromSelect(reasonSelect, "Archive reason");
+          if (reasonResult.cancelled) return;
+          payload.reason = reasonResult.reason;
         }
 
         if (action === "delete") {
@@ -1884,6 +2246,8 @@ function buildWaitlistAdminUiHtml() {
             method: "POST",
             body: JSON.stringify(payload),
           });
+
+          state.selectedContacts.delete(contactId);
 
           let successMessage = "";
           if (action === "archive") {
@@ -1913,10 +2277,13 @@ function buildWaitlistAdminUiHtml() {
           new: "New",
           archived: "Archived",
         });
+        populateArchiveReasonSelect(elements.bulkArchiveReasonSelect);
 
         loadTokenFromSession();
         resetPaging();
+        clearSelectedContacts();
         syncPaginationControls();
+        syncBulkControls();
 
         elements.filtersForm.addEventListener("submit", function (event) {
           event.preventDefault();
@@ -1938,21 +2305,26 @@ function buildWaitlistAdminUiHtml() {
         elements.forgetTokenButton.addEventListener("click", function () {
           clearTokenFromSession();
           resetPaging();
+          clearSelectedContacts();
+          state.currentPageContacts = [];
           elements.totalContacts.textContent = "-";
           elements.returnedContacts.textContent = "-";
           elements.emailReady.textContent = "-";
           elements.searchSummary.textContent = "All";
           elements.resultsMeta.textContent = "Token cleared. Paste it again to load contacts.";
           syncPaginationControls();
+          syncBulkControls();
           elements.contactsBody.innerHTML =
-            '<tr><td colspan="6" class="empty-state"><strong>Token removed.</strong>Paste it again to load contacts.</td></tr>';
+            '<tr><td colspan="7" class="empty-state"><strong>Token removed.</strong>Paste it again to load contacts.</td></tr>';
           clearMessage();
         });
 
         elements.resetFiltersButton.addEventListener("click", function () {
           resetFilters();
           resetPaging();
+          clearSelectedContacts();
           syncPaginationControls();
+          syncBulkControls();
         });
 
         elements.tokenInput.addEventListener("change", saveTokenToSession);
@@ -1961,6 +2333,19 @@ function buildWaitlistAdminUiHtml() {
         });
         elements.nextPageButton.addEventListener("click", function () {
           goToNextPage();
+        });
+        elements.selectPageButton.addEventListener("click", function () {
+          toggleCurrentPageSelection();
+        });
+        elements.clearSelectionButton.addEventListener("click", function () {
+          clearSelectedContacts();
+          renderContacts(state.currentPageContacts);
+        });
+        elements.bulkArchiveButton.addEventListener("click", function () {
+          handleBulkAction("archive");
+        });
+        elements.bulkDeleteButton.addEventListener("click", function () {
+          handleBulkAction("delete");
         });
 
         if (readToken()) {
@@ -2376,6 +2761,7 @@ app.get('/waitlist/admin', authenticateWaitlistAdmin, async (req, res) => {
       },
       exportFormats: ['json', 'csv'],
       contactActions: ['archive', 'delete'],
+      bulkContactActions: ['archive', 'delete'],
     });
   } catch (error) {
     if (error?.code === 'invalid_waitlist_admin_cursor') {
@@ -2398,8 +2784,9 @@ app.post('/waitlist/admin/contact', authenticateWaitlistAdmin, async (req, res) 
   }
 
   try {
-    if (parsed.data.action === 'archive') {
-      const result = await archiveWaitlistContact(parsed.data);
+    const result = await runWaitlistAdminAction(parsed.data);
+
+    if (result.action === 'archive') {
       return res.json({
         ok: true,
         action: 'archive',
@@ -2409,7 +2796,6 @@ app.post('/waitlist/admin/contact', authenticateWaitlistAdmin, async (req, res) 
       });
     }
 
-    const result = await deleteWaitlistContact(parsed.data);
     return res.json({
       ok: true,
       action: 'delete',
@@ -2424,6 +2810,33 @@ app.post('/waitlist/admin/contact', authenticateWaitlistAdmin, async (req, res) 
 
     console.error('[ai-proxy] Waitlist admin mutation failed:', error);
     return res.status(500).json({ error: 'waitlist_admin_mutation_failed' });
+  }
+});
+
+app.post('/waitlist/admin/bulk', authenticateWaitlistAdmin, async (req, res) => {
+  if (!ensureFirebaseApp()) {
+    return res.status(500).json({ error: 'firebase_waitlist_not_configured' });
+  }
+
+  const parsed = parseWaitlistAdminBulkAction(req.body);
+  if (!parsed.ok) {
+    return res.status(parsed.status).json({ error: parsed.error });
+  }
+
+  try {
+    const result = await runWaitlistAdminBulkAction(parsed.data);
+    return res.json({
+      ok: true,
+      action: result.action,
+      requestedCount: result.requestedCount,
+      successCount: result.successCount,
+      failureCount: result.failureCount,
+      deletedEventCount: result.deletedEventCount,
+      results: result.results,
+    });
+  } catch (error) {
+    console.error('[ai-proxy] Waitlist admin bulk mutation failed:', error);
+    return res.status(500).json({ error: 'waitlist_admin_bulk_mutation_failed' });
   }
 });
 
