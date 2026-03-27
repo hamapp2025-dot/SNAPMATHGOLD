@@ -85,6 +85,12 @@ curl -X POST \
   -H "Authorization: Bearer $WAITLIST_ADMIN_TOKEN" \
   -H "Content-Type: application/json" \
   http://localhost:3001/waitlist/admin/contact \
+  -d '{"action":"restore","email":"lead@example.com"}'
+
+curl -X POST \
+  -H "Authorization: Bearer $WAITLIST_ADMIN_TOKEN" \
+  -H "Content-Type: application/json" \
+  http://localhost:3001/waitlist/admin/contact \
   -d '{"action":"delete","email":"lead@example.com","confirm":"delete"}'
 
 curl -X POST \
@@ -92,6 +98,12 @@ curl -X POST \
   -H "Content-Type: application/json" \
   http://localhost:3001/waitlist/admin/bulk \
   -d '{"action":"archive","contactIds":["YUBjLmNvbQ","YmJAZXhhbXBsZS5jb20"],"reason":"duplicate signup"}'
+
+curl -X POST \
+  -H "Authorization: Bearer $WAITLIST_ADMIN_TOKEN" \
+  -H "Content-Type: application/json" \
+  http://localhost:3001/waitlist/admin/bulk \
+  -d '{"action":"restore","contactIds":["YUBjLmNvbQ","YmJAZXhhbXBsZS5jb20"]}'
 
 curl -X POST \
   -H "Authorization: Bearer $WAITLIST_ADMIN_TOKEN" \
@@ -109,7 +121,7 @@ The admin browser UI is:
 open "http://localhost:3001/waitlist/admin/ui"
 ```
 
-Paste `WAITLIST_ADMIN_TOKEN` into the UI to search, page through results, export, archive with preset reasons, or bulk archive/delete waitlist contacts without using raw API calls.
+Paste `WAITLIST_ADMIN_TOKEN` into the UI to search, page through results, export, archive with preset reasons, restore archived leads, or bulk archive/restore/delete waitlist contacts without using raw API calls.
 
 ## Render deployment
 

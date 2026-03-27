@@ -647,14 +647,15 @@ async function readWaitlistTotalCount() {
 }
 
 function parseWaitlistAdminContactAction(body) {
-  const action = normalizeSingleLine(body?.action, 20).toLowerCase();
+  const rawAction = normalizeSingleLine(body?.action, 20).toLowerCase();
+  const action = rawAction === 'unarchive' ? 'restore' : rawAction;
   const email = normalizeSingleLine(body?.email, 160).toLowerCase();
   const contactId = normalizeSingleLine(body?.contactId, 160);
   const reason = normalizeLongText(body?.reason, 300);
   const confirm = normalizeSingleLine(body?.confirm, 20).toLowerCase();
   const deleteEvents = typeof body?.deleteEvents === 'boolean' ? body.deleteEvents : true;
 
-  if (action !== 'archive' && action !== 'delete') {
+  if (action !== 'archive' && action !== 'delete' && action !== 'restore') {
     return { ok: false, status: 400, error: 'invalid_admin_action' };
   }
 
@@ -683,7 +684,8 @@ function parseWaitlistAdminContactAction(body) {
 }
 
 function parseWaitlistAdminBulkAction(body) {
-  const action = normalizeSingleLine(body?.action, 20).toLowerCase();
+  const rawAction = normalizeSingleLine(body?.action, 20).toLowerCase();
+  const action = rawAction === 'unarchive' ? 'restore' : rawAction;
   const reason = normalizeLongText(body?.reason, 300);
   const confirm = normalizeSingleLine(body?.confirm, 20).toLowerCase();
   const deleteEvents = typeof body?.deleteEvents === 'boolean' ? body.deleteEvents : true;
@@ -696,7 +698,7 @@ function parseWaitlistAdminBulkAction(body) {
     ),
   );
 
-  if (action !== 'archive' && action !== 'delete') {
+  if (action !== 'archive' && action !== 'delete' && action !== 'restore') {
     return { ok: false, status: 400, error: 'invalid_admin_action' };
   }
 
@@ -764,6 +766,24 @@ async function archiveWaitlistContact(actionInput) {
   };
 }
 
+async function restoreWaitlistContact(actionInput) {
+  const { contactRef, contactSnapshot } = await loadWaitlistContactForAdminAction(actionInput);
+  const previousContact = serializeWaitlistContact(contactSnapshot);
+  const payload = {
+    status: 'new',
+    archivedAt: admin.firestore.FieldValue.delete(),
+    archivedReason: admin.firestore.FieldValue.delete(),
+  };
+
+  await contactRef.set(payload, { merge: true });
+
+  return {
+    contactId: contactRef.id,
+    previousContact,
+    contact: serializeWaitlistContact(await contactRef.get()),
+  };
+}
+
 async function deleteWaitlistEventsForContact(contactId) {
   const eventsRef = admin.firestore().collection('landing_waitlist_events');
   let deletedEventCount = 0;
@@ -808,6 +828,16 @@ async function runWaitlistAdminAction(actionInput) {
     const result = await archiveWaitlistContact(actionInput);
     return {
       action: 'archive',
+      contactId: result.contactId,
+      previousContact: result.previousContact,
+      contact: result.contact,
+    };
+  }
+
+  if (actionInput.action === 'restore') {
+    const result = await restoreWaitlistContact(actionInput);
+    return {
+      action: 'restore',
       contactId: result.contactId,
       previousContact: result.previousContact,
       contact: result.contact,
@@ -1399,7 +1429,7 @@ function buildWaitlistAdminUiHtml() {
         <div>
           <h1>SnapMath Waitlist Admin</h1>
           <p>
-            Search, export, archive, or delete waitlist leads without touching Firestore directly.
+            Search, export, archive, restore, or delete waitlist leads without touching Firestore directly.
             This UI uses the same protected admin endpoints as the JSON API and keeps the token in
             session storage for the current browser tab only.
           </p>
@@ -1506,6 +1536,7 @@ function buildWaitlistAdminUiHtml() {
                 <select id="bulk-archive-reason"></select>
               </label>
               <button id="bulk-archive-button" class="secondary-button" type="button">Archive Selected</button>
+              <button id="bulk-restore-button" class="ghost-button" type="button">Restore Selected</button>
               <button id="bulk-delete-button" class="danger-button" type="button">Delete Selected</button>
             </div>
           </div>
@@ -1587,6 +1618,7 @@ function buildWaitlistAdminUiHtml() {
         clearSelectionButton: document.getElementById("clear-selection-button"),
         bulkArchiveReasonSelect: document.getElementById("bulk-archive-reason"),
         bulkArchiveButton: document.getElementById("bulk-archive-button"),
+        bulkRestoreButton: document.getElementById("bulk-restore-button"),
         bulkDeleteButton: document.getElementById("bulk-delete-button"),
         contactsBody: document.getElementById("contacts-body"),
         totalContacts: document.getElementById("total-contacts"),
@@ -1661,6 +1693,7 @@ function buildWaitlistAdminUiHtml() {
         elements.clearSelectionButton.disabled = state.loading || selectedCount === 0;
         elements.bulkArchiveReasonSelect.disabled = state.loading || selectedCount === 0;
         elements.bulkArchiveButton.disabled = state.loading || selectedCount === 0;
+        elements.bulkRestoreButton.disabled = state.loading || selectedCount === 0;
         elements.bulkDeleteButton.disabled = state.loading || selectedCount === 0;
       }
 
@@ -1917,6 +1950,14 @@ function buildWaitlistAdminUiHtml() {
               escapeHtml(contact.email || "") +
               '">Archive</button>'
           );
+        } else {
+          actionButtons.push(
+            '<button type="button" class="ghost-button" data-contact-action="restore" data-contact-id="' +
+              escapeHtml(contact.id) +
+              '" data-contact-email="' +
+              escapeHtml(contact.email || "") +
+              '">Restore</button>'
+          );
         }
         actionButtons.push(
           '<button type="button" class="danger" data-contact-action="delete" data-contact-id="' +
@@ -2154,6 +2195,13 @@ function buildWaitlistAdminUiHtml() {
           payload.reason = reasonResult.reason;
         }
 
+        if (action === "restore") {
+          const confirmed = window.confirm(
+            "Restore " + formatNumber(selectedContacts.length) + " selected contacts back to the active waitlist?"
+          );
+          if (!confirmed) return;
+        }
+
         if (action === "delete") {
           const confirmed = window.confirm(
             "Delete " +
@@ -2187,6 +2235,8 @@ function buildWaitlistAdminUiHtml() {
           let messageText = "";
           if (action === "archive") {
             messageText = "Archived " + formatNumber(data.successCount || 0) + " selected contacts.";
+          } else if (action === "restore") {
+            messageText = "Restored " + formatNumber(data.successCount || 0) + " selected contacts.";
           } else {
             messageText =
               "Deleted " +
@@ -2230,6 +2280,13 @@ function buildWaitlistAdminUiHtml() {
           payload.reason = reasonResult.reason;
         }
 
+        if (action === "restore") {
+          const confirmed = window.confirm(
+            "Restore " + (email || "this contact") + " back to the active waitlist?"
+          );
+          if (!confirmed) return;
+        }
+
         if (action === "delete") {
           const confirmed = window.confirm(
             "Delete " + (email || "this contact") + " and its waitlist event history?"
@@ -2252,6 +2309,8 @@ function buildWaitlistAdminUiHtml() {
           let successMessage = "";
           if (action === "archive") {
             successMessage = "Archived " + (email || contactId) + ".";
+          } else if (action === "restore") {
+            successMessage = "Restored " + (email || contactId) + ".";
           } else {
             successMessage =
               "Deleted " +
@@ -2343,6 +2402,9 @@ function buildWaitlistAdminUiHtml() {
         });
         elements.bulkArchiveButton.addEventListener("click", function () {
           handleBulkAction("archive");
+        });
+        elements.bulkRestoreButton.addEventListener("click", function () {
+          handleBulkAction("restore");
         });
         elements.bulkDeleteButton.addEventListener("click", function () {
           handleBulkAction("delete");
@@ -2760,8 +2822,8 @@ app.get('/waitlist/admin', authenticateWaitlistAdmin, async (req, res) => {
         hasNextPage,
       },
       exportFormats: ['json', 'csv'],
-      contactActions: ['archive', 'delete'],
-      bulkContactActions: ['archive', 'delete'],
+      contactActions: ['archive', 'restore', 'delete'],
+      bulkContactActions: ['archive', 'restore', 'delete'],
     });
   } catch (error) {
     if (error?.code === 'invalid_waitlist_admin_cursor') {
@@ -2786,10 +2848,10 @@ app.post('/waitlist/admin/contact', authenticateWaitlistAdmin, async (req, res) 
   try {
     const result = await runWaitlistAdminAction(parsed.data);
 
-    if (result.action === 'archive') {
+    if (result.action === 'archive' || result.action === 'restore') {
       return res.json({
         ok: true,
-        action: 'archive',
+        action: result.action,
         contactId: result.contactId,
         previousContact: result.previousContact,
         contact: result.contact,
