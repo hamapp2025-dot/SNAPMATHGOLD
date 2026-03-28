@@ -20,6 +20,14 @@ const WAITLIST_ALLOWED_INTERESTS = new Set([
   'semester-plan',
   'annual-plan',
 ]);
+const WAITLIST_LEAD_STAGE_OPTIONS = [
+  { value: 'new', label: 'New' },
+  { value: 'contacted', label: 'Contacted' },
+  { value: 'qualified', label: 'Qualified' },
+  { value: 'trial-booked', label: 'Trial booked' },
+  { value: 'converted', label: 'Converted' },
+];
+const WAITLIST_ALLOWED_LEAD_STAGES = new Set(WAITLIST_LEAD_STAGE_OPTIONS.map((item) => item.value));
 const WAITLIST_ADMIN_ARCHIVE_REASON_PRESETS = [
   { value: 'cleanup', label: 'Cleanup' },
   { value: 'test signup', label: 'Test signup' },
@@ -79,6 +87,37 @@ function normalizeSingleLine(value, maxLength = 200) {
 
 function normalizeLongText(value, maxLength = 1200) {
   return readString(value).replace(/\r\n/g, '\n').trim().slice(0, maxLength);
+}
+
+function normalizeWaitlistLeadStage(value, fallback = 'new') {
+  const stage = normalizeSingleLine(value, 40).toLowerCase();
+  return WAITLIST_ALLOWED_LEAD_STAGES.has(stage) ? stage : fallback;
+}
+
+function hasOwn(object, key) {
+  return Boolean(object) && Object.prototype.hasOwnProperty.call(object, key);
+}
+
+function parseOptionalAdminDateTime(value) {
+  const rawValue = readString(value);
+  if (!rawValue) {
+    return { ok: true, value: null };
+  }
+
+  const parsed = new Date(rawValue);
+  if (Number.isNaN(parsed.getTime())) {
+    return { ok: false, value: null };
+  }
+
+  return {
+    ok: true,
+    value: parsed.toISOString(),
+  };
+}
+
+function isDateTimeDue(value) {
+  const parsed = new Date(value);
+  return !Number.isNaN(parsed.getTime()) && parsed.getTime() <= Date.now();
 }
 
 function readNumberEnv(name, fallback) {
@@ -485,11 +524,13 @@ function serializeWaitlistContact(doc) {
     interest: readString(data.interest) || null,
     locale: readString(data.locale) || null,
     status: readString(data.status) || null,
+    stage: normalizeWaitlistLeadStage(data.stage, 'new'),
     archivedAt: timestampToISOString(data.archivedAt),
     archivedReason: readString(data.archivedReason) || null,
     source: readString(data.source) || null,
     sourceOrigin: readString(data.sourceOrigin) || null,
     notes: readString(data.notes),
+    internalNotes: readString(data.internalNotes) || null,
     submissionCount:
       typeof data.submissionCount === 'number' && Number.isFinite(data.submissionCount)
         ? data.submissionCount
@@ -500,6 +541,9 @@ function serializeWaitlistContact(doc) {
     confirmationEmailSentAt: timestampToISOString(data.confirmationEmailSentAt),
     firstSubmittedAt: timestampToISOString(data.firstSubmittedAt),
     lastSubmittedAt: timestampToISOString(data.lastSubmittedAt),
+    stageUpdatedAt: timestampToISOString(data.stageUpdatedAt),
+    lastContactedAt: timestampToISOString(data.lastContactedAt),
+    nextFollowUpAt: timestampToISOString(data.nextFollowUpAt),
     lastConfirmationAttemptAt: timestampToISOString(data.lastConfirmationAttemptAt),
     lastConfirmationError: readString(data.lastConfirmationError) || null,
     lastIp: readString(data.lastIp) || null,
@@ -511,9 +555,12 @@ function matchesWaitlistFilters(contact, filters) {
   if (filters.role && contact.role !== filters.role) return false;
   if (filters.interest && contact.interest !== filters.interest) return false;
   if (filters.status && contact.status !== filters.status) return false;
+  if (filters.stage && contact.stage !== filters.stage) return false;
 
   if (filters.search) {
-    const haystack = [contact.email, contact.name, contact.phone, contact.notes].join(' ').toLowerCase();
+    const haystack = [contact.email, contact.name, contact.phone, contact.notes, contact.internalNotes]
+      .join(' ')
+      .toLowerCase();
     if (!haystack.includes(filters.search)) return false;
   }
 
@@ -536,6 +583,7 @@ function buildWaitlistCsv(contacts) {
     'interest',
     'locale',
     'status',
+    'stage',
     'archivedAt',
     'archivedReason',
     'source',
@@ -546,11 +594,15 @@ function buildWaitlistCsv(contacts) {
     'confirmationEmailSentAt',
     'firstSubmittedAt',
     'lastSubmittedAt',
+    'stageUpdatedAt',
+    'lastContactedAt',
+    'nextFollowUpAt',
     'lastConfirmationAttemptAt',
     'lastConfirmationError',
     'lastIp',
     'lastUserAgent',
     'notes',
+    'internalNotes',
   ];
 
   const lines = contacts.map((contact) => headers.map((header) => csvEscape(contact[header])).join(','));
@@ -589,6 +641,7 @@ async function loadWaitlistContactsForAdmin(req) {
     role: readQueryString(req.query.role).toLowerCase(),
     interest: readQueryString(req.query.interest).toLowerCase(),
     status: readQueryString(req.query.status).toLowerCase(),
+    stage: readQueryString(req.query.stage).toLowerCase(),
     search: readQueryString(req.query.search).toLowerCase(),
   };
   const contactsRef = admin.firestore().collection('landing_waitlist_contacts');
@@ -644,6 +697,65 @@ async function readWaitlistTotalCount() {
   } catch {
     return null;
   }
+}
+
+async function readWaitlistAdminOverview(filters) {
+  const contactsRef = admin.firestore().collection('landing_waitlist_contacts');
+  let query = contactsRef.orderBy('lastSubmittedAt', 'desc');
+  const overview = {
+    matchingContacts: 0,
+    activeContacts: 0,
+    archivedContacts: 0,
+    followUpDue: 0,
+    followUpScheduled: 0,
+    roles: {},
+    interests: {},
+    statuses: {},
+    stages: {},
+  };
+
+  while (true) {
+    const snapshot = await query.limit(WAITLIST_ADMIN_QUERY_BATCH_LIMIT).get();
+    if (snapshot.empty) break;
+
+    for (const doc of snapshot.docs) {
+      const contact = serializeWaitlistContact(doc);
+      if (!matchesWaitlistFilters(contact, filters)) continue;
+
+      overview.matchingContacts += 1;
+
+      const roleKey = contact.role || 'unknown';
+      const interestKey = contact.interest || 'unknown';
+      const statusKey = contact.status || 'unknown';
+      overview.roles[roleKey] = (overview.roles[roleKey] || 0) + 1;
+      overview.interests[interestKey] = (overview.interests[interestKey] || 0) + 1;
+      overview.statuses[statusKey] = (overview.statuses[statusKey] || 0) + 1;
+
+      if (contact.status === 'archived') {
+        overview.archivedContacts += 1;
+        continue;
+      }
+
+      overview.activeContacts += 1;
+      const stageKey = contact.stage || 'new';
+      overview.stages[stageKey] = (overview.stages[stageKey] || 0) + 1;
+
+      if (contact.nextFollowUpAt) {
+        overview.followUpScheduled += 1;
+        if (isDateTimeDue(contact.nextFollowUpAt)) {
+          overview.followUpDue += 1;
+        }
+      }
+    }
+
+    if (snapshot.docs.length < WAITLIST_ADMIN_QUERY_BATCH_LIMIT) {
+      break;
+    }
+
+    query = contactsRef.orderBy('lastSubmittedAt', 'desc').startAfter(snapshot.docs[snapshot.docs.length - 1]);
+  }
+
+  return overview;
 }
 
 function parseWaitlistAdminContactAction(body) {
@@ -725,6 +837,93 @@ function parseWaitlistAdminBulkAction(body) {
   };
 }
 
+function parseWaitlistAdminContactUpdate(body) {
+  const email = normalizeSingleLine(body?.email, 160).toLowerCase();
+  const contactId = normalizeSingleLine(body?.contactId, 160);
+  const rawStage = normalizeSingleLine(body?.stage, 40).toLowerCase();
+  const updates = {};
+
+  if (!contactId && !email) {
+    return { ok: false, status: 400, error: 'missing_contact_reference' };
+  }
+
+  if (email && !isValidEmail(email)) {
+    return { ok: false, status: 400, error: 'invalid_email' };
+  }
+
+  if (hasOwn(body, 'stage')) {
+    if (!rawStage || !WAITLIST_ALLOWED_LEAD_STAGES.has(rawStage)) {
+      return { ok: false, status: 400, error: 'invalid_waitlist_lead_stage' };
+    }
+    updates.stage = rawStage;
+  }
+
+  if (hasOwn(body, 'internalNotes')) {
+    updates.internalNotes = normalizeLongText(body?.internalNotes, 2000);
+  }
+
+  if (hasOwn(body, 'lastContactedAt')) {
+    const parsed = parseOptionalAdminDateTime(body?.lastContactedAt);
+    if (!parsed.ok) {
+      return { ok: false, status: 400, error: 'invalid_last_contacted_at' };
+    }
+    updates.lastContactedAt = parsed.value;
+  }
+
+  if (hasOwn(body, 'nextFollowUpAt')) {
+    const parsed = parseOptionalAdminDateTime(body?.nextFollowUpAt);
+    if (!parsed.ok) {
+      return { ok: false, status: 400, error: 'invalid_next_follow_up_at' };
+    }
+    updates.nextFollowUpAt = parsed.value;
+  }
+
+  if (Object.keys(updates).length === 0) {
+    return { ok: false, status: 400, error: 'missing_contact_update' };
+  }
+
+  return {
+    ok: true,
+    data: {
+      email,
+      contactId: contactId || buildWaitlistDocumentId(email),
+      ...updates,
+    },
+  };
+}
+
+function parseWaitlistAdminBulkStageUpdate(body) {
+  const rawStage = normalizeSingleLine(body?.stage, 40).toLowerCase();
+  const rawContactIds = Array.isArray(body?.contactIds) ? body.contactIds : [];
+  const contactIds = Array.from(
+    new Set(
+      rawContactIds
+        .map((value) => normalizeSingleLine(value, 160))
+        .filter(Boolean),
+    ),
+  );
+
+  if (!rawStage || !WAITLIST_ALLOWED_LEAD_STAGES.has(rawStage)) {
+    return { ok: false, status: 400, error: 'invalid_waitlist_lead_stage' };
+  }
+
+  if (contactIds.length === 0) {
+    return { ok: false, status: 400, error: 'missing_contact_references' };
+  }
+
+  if (contactIds.length > WAITLIST_ADMIN_BULK_MAX_CONTACTS) {
+    return { ok: false, status: 400, error: 'too_many_contact_references' };
+  }
+
+  return {
+    ok: true,
+    data: {
+      stage: rawStage,
+      contactIds,
+    },
+  };
+}
+
 function createWaitlistContactNotFoundError(contactId) {
   const error = new Error(`waitlist contact not found: ${contactId}`);
   error.code = 'waitlist_contact_not_found';
@@ -774,6 +973,43 @@ async function restoreWaitlistContact(actionInput) {
     archivedAt: admin.firestore.FieldValue.delete(),
     archivedReason: admin.firestore.FieldValue.delete(),
   };
+
+  await contactRef.set(payload, { merge: true });
+
+  return {
+    contactId: contactRef.id,
+    previousContact,
+    contact: serializeWaitlistContact(await contactRef.get()),
+  };
+}
+
+async function updateWaitlistContactMetadata(actionInput) {
+  const { contactRef, contactSnapshot } = await loadWaitlistContactForAdminAction(actionInput);
+  const previousContact = serializeWaitlistContact(contactSnapshot);
+  const payload = {
+    lastAdminUpdateAt: admin.firestore.FieldValue.serverTimestamp(),
+  };
+
+  if (actionInput.stage !== undefined) {
+    payload.stage = actionInput.stage;
+    payload.stageUpdatedAt = admin.firestore.FieldValue.serverTimestamp();
+  }
+
+  if (actionInput.internalNotes !== undefined) {
+    payload.internalNotes = actionInput.internalNotes || '';
+  }
+
+  if (actionInput.lastContactedAt !== undefined) {
+    payload.lastContactedAt = actionInput.lastContactedAt
+      ? new Date(actionInput.lastContactedAt)
+      : admin.firestore.FieldValue.delete();
+  }
+
+  if (actionInput.nextFollowUpAt !== undefined) {
+    payload.nextFollowUpAt = actionInput.nextFollowUpAt
+      ? new Date(actionInput.nextFollowUpAt)
+      : admin.firestore.FieldValue.delete();
+  }
 
   await contactRef.set(payload, { merge: true });
 
@@ -898,9 +1134,52 @@ async function runWaitlistAdminBulkAction(actionInput) {
   };
 }
 
+async function runWaitlistAdminBulkStageUpdate(actionInput) {
+  const results = [];
+  let successCount = 0;
+  let failureCount = 0;
+
+  for (const contactId of actionInput.contactIds) {
+    try {
+      const result = await updateWaitlistContactMetadata({
+        contactId,
+        stage: actionInput.stage,
+      });
+
+      successCount += 1;
+      results.push({
+        ok: true,
+        action: 'stage',
+        stage: actionInput.stage,
+        contactId: result.contactId,
+        email: result.contact?.email || result.previousContact?.email || null,
+      });
+    } catch (error) {
+      failureCount += 1;
+      results.push({
+        ok: false,
+        action: 'stage',
+        stage: actionInput.stage,
+        contactId,
+        error: error?.code === 'waitlist_contact_not_found' ? error.code : 'waitlist_admin_mutation_failed',
+      });
+    }
+  }
+
+  return {
+    action: 'stage',
+    stage: actionInput.stage,
+    requestedCount: actionInput.contactIds.length,
+    successCount,
+    failureCount,
+    results,
+  };
+}
+
 function buildWaitlistAdminUiHtml() {
   const roleOptionsJson = JSON.stringify(Array.from(WAITLIST_ALLOWED_ROLES));
   const interestOptionsJson = JSON.stringify(Array.from(WAITLIST_ALLOWED_INTERESTS));
+  const leadStageOptionsJson = JSON.stringify(WAITLIST_LEAD_STAGE_OPTIONS);
   const archiveReasonPresetsJson = JSON.stringify(WAITLIST_ADMIN_ARCHIVE_REASON_PRESETS);
 
   return String.raw`<!DOCTYPE html>
@@ -1046,7 +1325,7 @@ function buildWaitlistAdminUiHtml() {
 
       .filters-grid {
         display: grid;
-        grid-template-columns: minmax(260px, 2fr) repeat(4, minmax(140px, 1fr));
+        grid-template-columns: minmax(260px, 2fr) repeat(5, minmax(130px, 1fr));
         gap: 14px;
       }
 
@@ -1096,7 +1375,7 @@ function buildWaitlistAdminUiHtml() {
 
       .stats {
         display: grid;
-        grid-template-columns: repeat(4, minmax(0, 1fr));
+        grid-template-columns: repeat(6, minmax(0, 1fr));
         gap: 14px;
       }
 
@@ -1208,8 +1487,55 @@ function buildWaitlistAdminUiHtml() {
         gap: 10px;
       }
 
+      .bulk-stage-field,
       .bulk-reason-field {
-        min-width: 220px;
+        min-width: 200px;
+      }
+
+      .section-heading {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 12px;
+        margin-bottom: 14px;
+      }
+
+      .section-heading h2 {
+        margin: 0;
+        font-size: 17px;
+      }
+
+      .section-heading p {
+        margin: 5px 0 0;
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .funnel-grid {
+        display: grid;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        gap: 12px;
+      }
+
+      .funnel-card {
+        padding: 15px 16px;
+        border-radius: 16px;
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid rgba(255, 255, 255, 0.06);
+      }
+
+      .funnel-label {
+        display: block;
+        margin-bottom: 8px;
+        color: var(--muted);
+        font-size: 12px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .funnel-card strong {
+        font-size: 22px;
+        line-height: 1;
       }
 
       .danger-button {
@@ -1230,7 +1556,7 @@ function buildWaitlistAdminUiHtml() {
       table {
         width: 100%;
         border-collapse: collapse;
-        min-width: 1180px;
+        min-width: 1560px;
       }
 
       th,
@@ -1285,7 +1611,7 @@ function buildWaitlistAdminUiHtml() {
       }
 
       .notes {
-        max-width: 300px;
+        max-width: 280px;
         white-space: pre-wrap;
         line-height: 1.52;
         font-size: 13px;
@@ -1320,6 +1646,36 @@ function buildWaitlistAdminUiHtml() {
         background: rgba(255, 255, 255, 0.07);
       }
 
+      .badge.stage-new {
+        color: #f3e39f;
+        background: rgba(191, 160, 68, 0.14);
+        border-color: rgba(191, 160, 68, 0.24);
+      }
+
+      .badge.stage-contacted {
+        color: #d7ecff;
+        background: rgba(100, 164, 255, 0.14);
+        border-color: rgba(100, 164, 255, 0.24);
+      }
+
+      .badge.stage-qualified {
+        color: #d7f0dd;
+        background: rgba(102, 194, 124, 0.14);
+        border-color: rgba(102, 194, 124, 0.24);
+      }
+
+      .badge.stage-trial-booked {
+        color: #f7e4b2;
+        background: rgba(245, 195, 91, 0.12);
+        border-color: rgba(245, 195, 91, 0.22);
+      }
+
+      .badge.stage-converted {
+        color: #d7f0dd;
+        background: rgba(54, 168, 92, 0.18);
+        border-color: rgba(54, 168, 92, 0.3);
+      }
+
       .badge.email-sent {
         color: #d2f1d9;
         background: rgba(102, 194, 124, 0.14);
@@ -1339,6 +1695,12 @@ function buildWaitlistAdminUiHtml() {
         border-color: rgba(245, 195, 91, 0.22);
       }
 
+      .badge.follow-up-due {
+        color: #ffd9d2;
+        background: rgba(239, 106, 91, 0.14);
+        border-color: rgba(239, 106, 91, 0.26);
+      }
+
       .row-actions {
         display: flex;
         flex-direction: column;
@@ -1347,6 +1709,16 @@ function buildWaitlistAdminUiHtml() {
       }
 
       .row-actions button {
+        width: 100%;
+      }
+
+      .crm-editor {
+        display: grid;
+        gap: 10px;
+        min-width: 280px;
+      }
+
+      .crm-editor button {
         width: 100%;
       }
 
@@ -1362,15 +1734,39 @@ function buildWaitlistAdminUiHtml() {
         text-transform: uppercase;
       }
 
-      .action-field select {
+      .action-field select,
+      .action-field input,
+      .action-field textarea {
         width: 100%;
-        min-height: 36px;
         border: 1px solid rgba(255, 255, 255, 0.12);
         border-radius: 10px;
         background: rgba(255, 255, 255, 0.04);
         color: var(--text);
-        padding: 0 10px;
         font-size: 13px;
+      }
+
+      .action-field select,
+      .action-field input {
+        min-height: 36px;
+        padding: 0 10px;
+      }
+
+      .action-field textarea {
+        min-height: 92px;
+        padding: 10px;
+        resize: vertical;
+      }
+
+      .action-field select:focus,
+      .action-field input:focus,
+      .action-field textarea:focus {
+        outline: 2px solid rgba(191, 160, 68, 0.42);
+        outline-offset: 1px;
+        border-color: rgba(191, 160, 68, 0.5);
+      }
+
+      .meta-line.due {
+        color: #ffd9d2;
       }
 
       .row-actions .danger {
@@ -1399,6 +1795,10 @@ function buildWaitlistAdminUiHtml() {
         .stats {
           grid-template-columns: repeat(2, minmax(0, 1fr));
         }
+
+        .funnel-grid {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
       }
 
       @media (max-width: 760px) {
@@ -1412,7 +1812,8 @@ function buildWaitlistAdminUiHtml() {
         }
 
         .filters-grid,
-        .stats {
+        .stats,
+        .funnel-grid {
           grid-template-columns: 1fr;
         }
 
@@ -1429,9 +1830,9 @@ function buildWaitlistAdminUiHtml() {
         <div>
           <h1>SnapMath Waitlist Admin</h1>
           <p>
-            Search, export, archive, restore, or delete waitlist leads without touching Firestore directly.
-            This UI uses the same protected admin endpoints as the JSON API and keeps the token in
-            session storage for the current browser tab only.
+            Search, qualify, follow up with, archive, restore, or delete waitlist leads without touching
+            Firestore directly. This UI uses the same protected admin endpoints as the JSON API and keeps
+            the token in session storage for the current browser tab only.
           </p>
         </div>
         <div class="hero-note">
@@ -1468,7 +1869,7 @@ function buildWaitlistAdminUiHtml() {
           <div class="filters-grid">
             <label class="field">
               <span>Search</span>
-              <input id="search-input" type="search" placeholder="Email, name, phone, or notes" />
+              <input id="search-input" type="search" placeholder="Email, name, phone, notes, or internal notes" />
             </label>
             <label class="field">
               <span>Role</span>
@@ -1481,6 +1882,10 @@ function buildWaitlistAdminUiHtml() {
             <label class="field">
               <span>Status</span>
               <select id="status-filter"></select>
+            </label>
+            <label class="field">
+              <span>Lead Stage</span>
+              <select id="stage-filter"></select>
             </label>
             <label class="field">
               <span>Limit</span>
@@ -1499,17 +1904,35 @@ function buildWaitlistAdminUiHtml() {
             <strong id="total-contacts">-</strong>
           </div>
           <div class="stat">
-            <span class="label">Returned</span>
+            <span class="label">Matching Filters</span>
+            <strong id="matching-contacts">-</strong>
+          </div>
+          <div class="stat">
+            <span class="label">This Page</span>
             <strong id="returned-contacts">-</strong>
+          </div>
+          <div class="stat">
+            <span class="label">Follow-Ups Due</span>
+            <strong id="follow-up-due">-</strong>
+          </div>
+          <div class="stat">
+            <span class="label">Converted</span>
+            <strong id="converted-contacts">-</strong>
           </div>
           <div class="stat">
             <span class="label">Email Pipeline</span>
             <strong id="email-ready">-</strong>
           </div>
-          <div class="stat">
-            <span class="label">Current Search</span>
-            <strong id="search-summary">All</strong>
+        </section>
+
+        <section class="panel">
+          <div class="section-heading">
+            <div>
+              <h2>Lead Funnel</h2>
+              <p>Counts reflect matching active contacts only, excluding archived cleanup records.</p>
+            </div>
           </div>
+          <div id="funnel-grid" class="funnel-grid"></div>
         </section>
 
         <div id="message" class="message" role="status" aria-live="polite"></div>
@@ -1531,6 +1954,11 @@ function buildWaitlistAdminUiHtml() {
             <div class="bulk-actions">
               <button id="select-page-button" class="ghost-button" type="button">Select Page</button>
               <button id="clear-selection-button" class="ghost-button" type="button">Clear Selection</button>
+              <label class="field bulk-stage-field">
+                <span>Bulk Stage</span>
+                <select id="bulk-stage-select"></select>
+              </label>
+              <button id="bulk-stage-button" class="secondary-button" type="button">Update Stage</button>
               <label class="field bulk-reason-field">
                 <span>Bulk Archive Reason</span>
                 <select id="bulk-archive-reason"></select>
@@ -1552,13 +1980,14 @@ function buildWaitlistAdminUiHtml() {
                   <th>Details</th>
                   <th>Status</th>
                   <th>Activity</th>
-                  <th>Notes</th>
+                  <th>Lead Note</th>
+                  <th>CRM</th>
                   <th>Actions</th>
                 </tr>
               </thead>
               <tbody id="contacts-body">
                 <tr>
-                  <td colspan="7" class="empty-state">
+                  <td colspan="8" class="empty-state">
                     <strong>No data loaded yet.</strong>
                     Paste the admin token and click <em>Load Contacts</em>.
                   </td>
@@ -1573,6 +2002,7 @@ function buildWaitlistAdminUiHtml() {
     <script>
       const ROLE_OPTIONS = ${roleOptionsJson};
       const INTEREST_OPTIONS = ${interestOptionsJson};
+      const LEAD_STAGE_OPTIONS = ${leadStageOptionsJson};
       const ARCHIVE_REASON_PRESETS = ${archiveReasonPresetsJson};
       const STATUS_OPTIONS = ["", "new", "archived"];
       const CUSTOM_ARCHIVE_REASON_VALUE = "__custom__";
@@ -1587,6 +2017,13 @@ function buildWaitlistAdminUiHtml() {
         "semester-plan": "Semester plan",
         "annual-plan": "Annual plan",
       };
+      const LEAD_STAGE_LABELS = LEAD_STAGE_OPTIONS.reduce(function (result, item) {
+        result[item.value] = item.label;
+        return result;
+      }, {});
+      const LEAD_STAGE_VALUES = LEAD_STAGE_OPTIONS.map(function (item) {
+        return item.value;
+      });
       const EMAIL_STATUS_LABELS = {
         sent: "Email sent",
         failed: "Email failed",
@@ -1602,6 +2039,7 @@ function buildWaitlistAdminUiHtml() {
         roleFilter: document.getElementById("role-filter"),
         interestFilter: document.getElementById("interest-filter"),
         statusFilter: document.getElementById("status-filter"),
+        stageFilter: document.getElementById("stage-filter"),
         loadButton: document.getElementById("load-button"),
         exportJsonButton: document.getElementById("export-json-button"),
         exportCsvButton: document.getElementById("export-csv-button"),
@@ -1616,15 +2054,20 @@ function buildWaitlistAdminUiHtml() {
         selectedCount: document.getElementById("selected-count"),
         selectPageButton: document.getElementById("select-page-button"),
         clearSelectionButton: document.getElementById("clear-selection-button"),
+        bulkStageSelect: document.getElementById("bulk-stage-select"),
+        bulkStageButton: document.getElementById("bulk-stage-button"),
         bulkArchiveReasonSelect: document.getElementById("bulk-archive-reason"),
         bulkArchiveButton: document.getElementById("bulk-archive-button"),
         bulkRestoreButton: document.getElementById("bulk-restore-button"),
         bulkDeleteButton: document.getElementById("bulk-delete-button"),
         contactsBody: document.getElementById("contacts-body"),
         totalContacts: document.getElementById("total-contacts"),
+        matchingContacts: document.getElementById("matching-contacts"),
         returnedContacts: document.getElementById("returned-contacts"),
+        followUpDue: document.getElementById("follow-up-due"),
+        convertedContacts: document.getElementById("converted-contacts"),
         emailReady: document.getElementById("email-ready"),
-        searchSummary: document.getElementById("search-summary"),
+        funnelGrid: document.getElementById("funnel-grid"),
       };
 
       const state = {
@@ -1691,6 +2134,8 @@ function buildWaitlistAdminUiHtml() {
         elements.selectPageButton.disabled = state.loading || state.currentPageContacts.length === 0;
         elements.selectPageButton.textContent = areAllCurrentPageContactsSelected() ? "Unselect Page" : "Select Page";
         elements.clearSelectionButton.disabled = state.loading || selectedCount === 0;
+        elements.bulkStageSelect.disabled = state.loading || selectedCount === 0;
+        elements.bulkStageButton.disabled = state.loading || selectedCount === 0;
         elements.bulkArchiveReasonSelect.disabled = state.loading || selectedCount === 0;
         elements.bulkArchiveButton.disabled = state.loading || selectedCount === 0;
         elements.bulkRestoreButton.disabled = state.loading || selectedCount === 0;
@@ -1705,7 +2150,9 @@ function buildWaitlistAdminUiHtml() {
         elements.resetFiltersButton.disabled = loading;
         elements.forgetTokenButton.disabled = loading;
         elements.loadButton.textContent = loading ? "Loading..." : "Load Contacts";
-        Array.from(document.querySelectorAll("[data-contact-action], [data-contact-select]")).forEach(function (element) {
+        Array.from(
+          document.querySelectorAll("[data-contact-action], [data-contact-select], [data-contact-save], [data-contact-field]")
+        ).forEach(function (element) {
           element.disabled = loading;
         });
         syncPaginationControls();
@@ -1751,6 +2198,7 @@ function buildWaitlistAdminUiHtml() {
           role: elements.roleFilter.value,
           interest: elements.interestFilter.value,
           status: elements.statusFilter.value,
+          stage: elements.stageFilter.value,
         };
       }
 
@@ -1760,6 +2208,7 @@ function buildWaitlistAdminUiHtml() {
         elements.roleFilter.value = "";
         elements.interestFilter.value = "";
         elements.statusFilter.value = "";
+        elements.stageFilter.value = "";
       }
 
       function populateSelect(select, values, labels) {
@@ -1787,6 +2236,47 @@ function buildWaitlistAdminUiHtml() {
       function formatNumber(value) {
         if (value == null || Number.isNaN(Number(value))) return "—";
         return Number(value).toLocaleString();
+      }
+
+      function padNumber(value) {
+        return String(value).padStart(2, "0");
+      }
+
+      function formatDateTimeInputValue(value) {
+        if (!value) return "";
+        const parsed = new Date(value);
+        if (Number.isNaN(parsed.getTime())) return "";
+        return (
+          parsed.getFullYear() +
+          "-" +
+          padNumber(parsed.getMonth() + 1) +
+          "-" +
+          padNumber(parsed.getDate()) +
+          "T" +
+          padNumber(parsed.getHours()) +
+          ":" +
+          padNumber(parsed.getMinutes())
+        );
+      }
+
+      function serializeDateTimeInputValue(value) {
+        const rawValue = String(value || "").trim();
+        if (!rawValue) return "";
+        const parsed = new Date(rawValue);
+        if (Number.isNaN(parsed.getTime())) return null;
+        return parsed.toISOString();
+      }
+
+      function isDateDue(value) {
+        if (!value) return false;
+        const parsed = new Date(value);
+        return !Number.isNaN(parsed.getTime()) && parsed.getTime() <= Date.now();
+      }
+
+      function sanitizeClassToken(value) {
+        return String(value || "unknown")
+          .toLowerCase()
+          .replace(/[^a-z0-9-]/g, "-");
       }
 
       async function apiFetchJson(path, options) {
@@ -1826,24 +2316,46 @@ function buildWaitlistAdminUiHtml() {
         if (filters.role) parts.push(ROLE_LABELS[filters.role] || filters.role);
         if (filters.interest) parts.push(INTEREST_LABELS[filters.interest] || filters.interest);
         if (filters.status) parts.push(filters.status);
+        if (filters.stage) parts.push(LEAD_STAGE_LABELS[filters.stage] || filters.stage);
         if (!parts.length) return "All";
         return parts.join(" · ");
       }
 
+      function renderFunnel(data) {
+        const overview = (data && data.overview) || {};
+        const stageCounts = overview.stages || {};
+        elements.funnelGrid.innerHTML = LEAD_STAGE_OPTIONS.map(function (stage) {
+          return (
+            '<div class="funnel-card">' +
+              '<span class="funnel-label">' + escapeHtml(stage.label) + "</span>" +
+              "<strong>" + escapeHtml(data ? formatNumber(stageCounts[stage.value] || 0) : "—") + "</strong>" +
+            "</div>"
+          );
+        }).join("");
+      }
+
       function renderSummary(data) {
         const filters = data.filters || {};
+        const overview = data.overview || {};
         elements.totalContacts.textContent = formatNumber(data.totalContacts);
+        elements.matchingContacts.textContent = formatNumber(overview.matchingContacts);
         elements.returnedContacts.textContent = formatNumber(data.returnedContacts);
+        elements.followUpDue.textContent = formatNumber(overview.followUpDue);
+        elements.convertedContacts.textContent = formatNumber((overview.stages && overview.stages.converted) || 0);
         elements.emailReady.textContent = data.waitlistEmailReady ? "Ready" : "Not ready";
-        elements.searchSummary.textContent = getSearchSummary(filters);
         elements.resultsMeta.textContent =
-          "Showing " +
+          "Current view: " +
+          getSearchSummary(filters) +
+          ". Showing " +
           formatNumber(data.returnedContacts) +
           " contacts on page " +
           formatNumber(getCurrentPageNumber()) +
+          ". Matching filters: " +
+          formatNumber(overview.matchingContacts) +
           ". Total waitlist size: " +
           formatNumber(data.totalContacts) +
           ".";
+        renderFunnel(data);
       }
 
       function renderPagination(data) {
@@ -1871,6 +2383,25 @@ function buildWaitlistAdminUiHtml() {
             CUSTOM_ARCHIVE_REASON_VALUE +
             '">Custom reason...</option>'
         );
+        return options.join("");
+      }
+
+      function buildLeadStageOptionsHtml(selectedValue, includeAllOption) {
+        const options = [];
+        if (includeAllOption) {
+          options.push('<option value="">All</option>');
+        }
+        LEAD_STAGE_OPTIONS.forEach(function (item) {
+          options.push(
+            '<option value="' +
+              escapeHtml(item.value) +
+              '"' +
+              (item.value === selectedValue ? " selected" : "") +
+              ">" +
+              escapeHtml(item.label) +
+              "</option>"
+          );
+        });
         return options.join("");
       }
 
@@ -1906,6 +2437,12 @@ function buildWaitlistAdminUiHtml() {
         const badges = [];
         const statusClass = contact.status === "archived" ? "status-archived" : "status-new";
         badges.push(buildBadge(contact.status || "unknown", statusClass));
+        badges.push(
+          buildBadge(
+            LEAD_STAGE_LABELS[contact.stage] || contact.stage || "New",
+            "stage-" + sanitizeClassToken(contact.stage || "new")
+          )
+        );
 
         if (contact.confirmationEmailStatus) {
           const emailClass = "email-" + String(contact.confirmationEmailStatus).replace(/[^a-z-]/g, "");
@@ -1913,6 +2450,10 @@ function buildWaitlistAdminUiHtml() {
             EMAIL_STATUS_LABELS[contact.confirmationEmailStatus] || contact.confirmationEmailStatus,
             emailClass
           ));
+        }
+
+        if (contact.nextFollowUpAt && isDateDue(contact.nextFollowUpAt)) {
+          badges.push(buildBadge("Follow-up due", "follow-up-due"));
         }
 
         return '<div class="badge-row">' + badges.join("") + "</div>";
@@ -1930,6 +2471,22 @@ function buildWaitlistAdminUiHtml() {
         activity.push('<div class="meta-line"><strong>First:</strong> ' + escapeHtml(formatDate(contact.firstSubmittedAt)) + "</div>");
         if (contact.archivedAt) {
           activity.push('<div class="meta-line"><strong>Archived:</strong> ' + escapeHtml(formatDate(contact.archivedAt)) + "</div>");
+        }
+        if (contact.lastContactedAt) {
+          activity.push('<div class="meta-line"><strong>Last contact:</strong> ' + escapeHtml(formatDate(contact.lastContactedAt)) + "</div>");
+        }
+        if (contact.nextFollowUpAt) {
+          activity.push(
+            '<div class="meta-line' +
+              (isDateDue(contact.nextFollowUpAt) ? " due" : "") +
+              '"><strong>Next follow-up:</strong> ' +
+              escapeHtml(formatDate(contact.nextFollowUpAt)) +
+              (isDateDue(contact.nextFollowUpAt) ? " (due)" : "") +
+              "</div>"
+          );
+        }
+        if (contact.stageUpdatedAt) {
+          activity.push('<div class="meta-line"><strong>Stage updated:</strong> ' + escapeHtml(formatDate(contact.stageUpdatedAt)) + "</div>");
         }
         activity.push('<div class="meta-line"><strong>Submissions:</strong> ' + escapeHtml(formatNumber(contact.submissionCount)) + "</div>");
 
@@ -1967,6 +2524,41 @@ function buildWaitlistAdminUiHtml() {
             '">Delete</button>'
         );
 
+        const crmEditor =
+          '<div class="crm-editor" data-contact-editor="' +
+          escapeHtml(contact.id) +
+          '">' +
+            '<label class="action-field">' +
+              "<span>Lead Stage</span>" +
+              '<select data-contact-field data-stage-select>' +
+                buildLeadStageOptionsHtml(contact.stage || "new", false) +
+              "</select>" +
+            "</label>" +
+            '<label class="action-field">' +
+              "<span>Last Contacted</span>" +
+              '<input data-contact-field data-last-contacted-at type="datetime-local" value="' +
+                escapeHtml(formatDateTimeInputValue(contact.lastContactedAt)) +
+                '" />' +
+            "</label>" +
+            '<label class="action-field">' +
+              "<span>Next Follow-Up</span>" +
+              '<input data-contact-field data-next-follow-up-at type="datetime-local" value="' +
+                escapeHtml(formatDateTimeInputValue(contact.nextFollowUpAt)) +
+                '" />' +
+            "</label>" +
+            '<label class="action-field">' +
+              "<span>Internal Notes</span>" +
+              '<textarea data-contact-field data-internal-notes placeholder="Private follow-up notes for your team.">' +
+                escapeHtml(contact.internalNotes || "") +
+              "</textarea>" +
+            "</label>" +
+            '<button type="button" class="secondary-button" data-contact-save="true" data-contact-id="' +
+              escapeHtml(contact.id) +
+              '" data-contact-email="' +
+              escapeHtml(contact.email || "") +
+              '">Save CRM</button>' +
+          "</div>";
+
         return (
           "<tr>" +
             '<td class="selection-cell">' +
@@ -1998,6 +2590,7 @@ function buildWaitlistAdminUiHtml() {
             "</td>" +
             "<td>" + activity.join("") + "</td>" +
             "<td><div class=\"notes\">" + escapeHtml(contact.notes || "—") + "</div></td>" +
+            "<td>" + crmEditor + "</td>" +
             '<td><div class="row-actions">' + actionButtons.join("") + "</div></td>" +
           "</tr>"
         );
@@ -2006,7 +2599,7 @@ function buildWaitlistAdminUiHtml() {
       function renderContacts(contacts) {
         if (!Array.isArray(contacts) || contacts.length === 0) {
           elements.contactsBody.innerHTML =
-            '<tr><td colspan="7" class="empty-state"><strong>No contacts matched these filters.</strong>Try a broader search or increase the limit.</td></tr>';
+            '<tr><td colspan="8" class="empty-state"><strong>No contacts matched these filters.</strong>Try a broader search or increase the limit.</td></tr>';
           syncBulkControls();
           return;
         }
@@ -2037,6 +2630,11 @@ function buildWaitlistAdminUiHtml() {
         Array.from(elements.contactsBody.querySelectorAll("[data-contact-action]")).forEach(function (button) {
           button.addEventListener("click", function () {
             handleContactAction(button);
+          });
+        });
+        Array.from(elements.contactsBody.querySelectorAll("[data-contact-save]")).forEach(function (button) {
+          button.addEventListener("click", function () {
+            handleContactUpdate(button);
           });
         });
         syncBulkControls();
@@ -2126,6 +2724,55 @@ function buildWaitlistAdminUiHtml() {
         });
 
         renderContacts(state.currentPageContacts);
+      }
+
+      async function handleBulkStageUpdate() {
+        const selectedContacts = Array.from(state.selectedContacts.values());
+        if (selectedContacts.length === 0) return;
+
+        const stage = elements.bulkStageSelect.value;
+        if (!stage) {
+          setMessage("error", "Choose a lead stage before updating the selection.");
+          return;
+        }
+
+        clearMessage();
+        setLoading(true);
+
+        try {
+          const data = await apiFetchJson("/waitlist/admin/bulk/stage", {
+            method: "POST",
+            body: JSON.stringify({
+              stage: stage,
+              contactIds: selectedContacts.map(function (contact) {
+                return contact.id;
+              }),
+            }),
+          });
+
+          const messageKind =
+            data.failureCount > 0
+              ? (Number(data.successCount || 0) > 0 ? "warning" : "error")
+              : "success";
+
+          let messageText =
+            "Updated stage to " +
+            (LEAD_STAGE_LABELS[stage] || stage) +
+            " for " +
+            formatNumber(data.successCount || 0) +
+            " selected contacts.";
+
+          if (data.failureCount > 0) {
+            messageText += " " + formatNumber(data.failureCount) + " failed.";
+          }
+
+          await loadContacts({ silent: true });
+          setMessage(messageKind, messageText);
+        } catch (error) {
+          setMessage("error", error.message || "Could not update the selected lead stages.");
+        } finally {
+          setLoading(false);
+        }
       }
 
       async function exportContacts(format) {
@@ -2259,6 +2906,54 @@ function buildWaitlistAdminUiHtml() {
         }
       }
 
+      async function handleContactUpdate(button) {
+        const contactId = button.getAttribute("data-contact-id");
+        const email = button.getAttribute("data-contact-email") || "";
+        const actionContainer = button.closest("[data-contact-editor]");
+        if (!contactId || !actionContainer) return;
+
+        const stageSelect = actionContainer.querySelector("[data-stage-select]");
+        const lastContactedInput = actionContainer.querySelector("[data-last-contacted-at]");
+        const nextFollowUpInput = actionContainer.querySelector("[data-next-follow-up-at]");
+        const internalNotesInput = actionContainer.querySelector("[data-internal-notes]");
+
+        const lastContactedAt = serializeDateTimeInputValue(lastContactedInput ? lastContactedInput.value : "");
+        if (lastContactedAt === null) {
+          setMessage("error", "Enter a valid last-contacted date and time.");
+          return;
+        }
+
+        const nextFollowUpAt = serializeDateTimeInputValue(nextFollowUpInput ? nextFollowUpInput.value : "");
+        if (nextFollowUpAt === null) {
+          setMessage("error", "Enter a valid next follow-up date and time.");
+          return;
+        }
+
+        clearMessage();
+        setLoading(true);
+
+        try {
+          await apiFetchJson("/waitlist/admin/contact/update", {
+            method: "POST",
+            body: JSON.stringify({
+              contactId: contactId,
+              email: email,
+              stage: stageSelect ? stageSelect.value : "new",
+              internalNotes: internalNotesInput ? internalNotesInput.value : "",
+              lastContactedAt: lastContactedAt,
+              nextFollowUpAt: nextFollowUpAt,
+            }),
+          });
+
+          await loadContacts({ silent: true });
+          setMessage("success", "Saved CRM updates for " + (email || contactId) + ".");
+        } catch (error) {
+          setMessage("error", error.message || "Could not save the CRM fields.");
+        } finally {
+          setLoading(false);
+        }
+      }
+
       async function handleContactAction(button) {
         const action = button.getAttribute("data-contact-action");
         const contactId = button.getAttribute("data-contact-id");
@@ -2336,11 +3031,14 @@ function buildWaitlistAdminUiHtml() {
           new: "New",
           archived: "Archived",
         });
+        populateSelect(elements.stageFilter, LEAD_STAGE_VALUES, LEAD_STAGE_LABELS);
+        elements.bulkStageSelect.innerHTML = buildLeadStageOptionsHtml(LEAD_STAGE_VALUES[0] || "new", false);
         populateArchiveReasonSelect(elements.bulkArchiveReasonSelect);
 
         loadTokenFromSession();
         resetPaging();
         clearSelectedContacts();
+        renderFunnel(null);
         syncPaginationControls();
         syncBulkControls();
 
@@ -2367,14 +3065,17 @@ function buildWaitlistAdminUiHtml() {
           clearSelectedContacts();
           state.currentPageContacts = [];
           elements.totalContacts.textContent = "-";
+          elements.matchingContacts.textContent = "-";
           elements.returnedContacts.textContent = "-";
+          elements.followUpDue.textContent = "-";
+          elements.convertedContacts.textContent = "-";
           elements.emailReady.textContent = "-";
-          elements.searchSummary.textContent = "All";
           elements.resultsMeta.textContent = "Token cleared. Paste it again to load contacts.";
+          renderFunnel(null);
           syncPaginationControls();
           syncBulkControls();
           elements.contactsBody.innerHTML =
-            '<tr><td colspan="7" class="empty-state"><strong>Token removed.</strong>Paste it again to load contacts.</td></tr>';
+            '<tr><td colspan="8" class="empty-state"><strong>Token removed.</strong>Paste it again to load contacts.</td></tr>';
           clearMessage();
         });
 
@@ -2399,6 +3100,9 @@ function buildWaitlistAdminUiHtml() {
         elements.clearSelectionButton.addEventListener("click", function () {
           clearSelectedContacts();
           renderContacts(state.currentPageContacts);
+        });
+        elements.bulkStageButton.addEventListener("click", function () {
+          handleBulkStageUpdate();
         });
         elements.bulkArchiveButton.addEventListener("click", function () {
           handleBulkAction("archive");
@@ -2449,6 +3153,7 @@ async function storeWaitlistLead(req, submission) {
     lastSubmittedAt: submittedAt,
     submissionCount: admin.firestore.FieldValue.increment(1),
     status: existingContact.exists ? readString(existingContact.get('status'), 'new') : 'new',
+    stage: existingContact.exists ? normalizeWaitlistLeadStage(existingData.stage, 'new') : 'new',
   };
 
   if (!existingContact.exists) {
@@ -2787,23 +3492,27 @@ app.get('/waitlist/admin', authenticateWaitlistAdmin, async (req, res) => {
   }
 
   try {
-    const [{ contacts, filters, limit, cursor, nextCursor, hasNextPage }, totalContacts] = await Promise.all([
-      loadWaitlistContactsForAdmin(req),
+    const { contacts, filters, limit, cursor, nextCursor, hasNextPage } = await loadWaitlistContactsForAdmin(req);
+    const [totalContacts, overview] = await Promise.all([
       readWaitlistTotalCount(),
+      readWaitlistAdminOverview(filters),
     ]);
     const counts = {
       roles: {},
       interests: {},
       statuses: {},
+      stages: {},
     };
 
     for (const contact of contacts) {
       const roleKey = contact.role || 'unknown';
       const interestKey = contact.interest || 'unknown';
       const statusKey = contact.status || 'unknown';
+      const stageKey = contact.stage || 'new';
       counts.roles[roleKey] = (counts.roles[roleKey] || 0) + 1;
       counts.interests[interestKey] = (counts.interests[interestKey] || 0) + 1;
       counts.statuses[statusKey] = (counts.statuses[statusKey] || 0) + 1;
+      counts.stages[stageKey] = (counts.stages[stageKey] || 0) + 1;
     }
 
     return res.json({
@@ -2815,7 +3524,9 @@ app.get('/waitlist/admin', authenticateWaitlistAdmin, async (req, res) => {
       waitlistEmailReady: isWaitlistEmailReady(),
       contacts,
       counts,
+      overview,
       archiveReasonPresets: WAITLIST_ADMIN_ARCHIVE_REASON_PRESETS,
+      leadStageOptions: WAITLIST_LEAD_STAGE_OPTIONS,
       pagination: {
         cursor,
         nextCursor,
@@ -2832,6 +3543,35 @@ app.get('/waitlist/admin', authenticateWaitlistAdmin, async (req, res) => {
 
     console.error('[ai-proxy] Waitlist admin read failed:', error);
     return res.status(500).json({ error: 'waitlist_admin_read_failed' });
+  }
+});
+
+app.post('/waitlist/admin/contact/update', authenticateWaitlistAdmin, async (req, res) => {
+  if (!ensureFirebaseApp()) {
+    return res.status(500).json({ error: 'firebase_waitlist_not_configured' });
+  }
+
+  const parsed = parseWaitlistAdminContactUpdate(req.body);
+  if (!parsed.ok) {
+    return res.status(parsed.status).json({ error: parsed.error });
+  }
+
+  try {
+    const result = await updateWaitlistContactMetadata(parsed.data);
+    return res.json({
+      ok: true,
+      action: 'update',
+      contactId: result.contactId,
+      previousContact: result.previousContact,
+      contact: result.contact,
+    });
+  } catch (error) {
+    if (error?.code === 'waitlist_contact_not_found') {
+      return res.status(404).json({ error: error.code });
+    }
+
+    console.error('[ai-proxy] Waitlist admin contact update failed:', error);
+    return res.status(500).json({ error: 'waitlist_admin_update_failed' });
   }
 });
 
@@ -2899,6 +3639,33 @@ app.post('/waitlist/admin/bulk', authenticateWaitlistAdmin, async (req, res) => 
   } catch (error) {
     console.error('[ai-proxy] Waitlist admin bulk mutation failed:', error);
     return res.status(500).json({ error: 'waitlist_admin_bulk_mutation_failed' });
+  }
+});
+
+app.post('/waitlist/admin/bulk/stage', authenticateWaitlistAdmin, async (req, res) => {
+  if (!ensureFirebaseApp()) {
+    return res.status(500).json({ error: 'firebase_waitlist_not_configured' });
+  }
+
+  const parsed = parseWaitlistAdminBulkStageUpdate(req.body);
+  if (!parsed.ok) {
+    return res.status(parsed.status).json({ error: parsed.error });
+  }
+
+  try {
+    const result = await runWaitlistAdminBulkStageUpdate(parsed.data);
+    return res.json({
+      ok: true,
+      action: result.action,
+      stage: result.stage,
+      requestedCount: result.requestedCount,
+      successCount: result.successCount,
+      failureCount: result.failureCount,
+      results: result.results,
+    });
+  } catch (error) {
+    console.error('[ai-proxy] Waitlist admin bulk stage update failed:', error);
+    return res.status(500).json({ error: 'waitlist_admin_bulk_stage_update_failed' });
   }
 });
 

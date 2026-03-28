@@ -10,7 +10,9 @@ Small Express service that turns `AI Chat` and `MathScan` into managed backend f
 - Exposes `GET /waitlist/admin`
 - Exposes `GET /waitlist/admin/ui`
 - Exposes `POST /waitlist/admin/contact`
+- Exposes `POST /waitlist/admin/contact/update`
 - Exposes `POST /waitlist/admin/bulk`
+- Exposes `POST /waitlist/admin/bulk/stage`
 - Exposes `GET /waitlist/export`
 - Verifies Firebase ID tokens by default
 - Applies a simple in-memory rate limit
@@ -90,6 +92,12 @@ curl -X POST \
 curl -X POST \
   -H "Authorization: Bearer $WAITLIST_ADMIN_TOKEN" \
   -H "Content-Type: application/json" \
+  http://localhost:3001/waitlist/admin/contact/update \
+  -d '{"email":"lead@example.com","stage":"qualified","internalNotes":"Parent asked for a call after Maghrib.","lastContactedAt":"2026-03-27T19:00:00.000Z","nextFollowUpAt":"2026-03-29T16:00:00.000Z"}'
+
+curl -X POST \
+  -H "Authorization: Bearer $WAITLIST_ADMIN_TOKEN" \
+  -H "Content-Type: application/json" \
   http://localhost:3001/waitlist/admin/contact \
   -d '{"action":"delete","email":"lead@example.com","confirm":"delete"}'
 
@@ -108,6 +116,12 @@ curl -X POST \
 curl -X POST \
   -H "Authorization: Bearer $WAITLIST_ADMIN_TOKEN" \
   -H "Content-Type: application/json" \
+  http://localhost:3001/waitlist/admin/bulk/stage \
+  -d '{"stage":"trial-booked","contactIds":["YUBjLmNvbQ","YmJAZXhhbXBsZS5jb20"]}'
+
+curl -X POST \
+  -H "Authorization: Bearer $WAITLIST_ADMIN_TOKEN" \
+  -H "Content-Type: application/json" \
   http://localhost:3001/waitlist/admin/bulk \
   -d '{"action":"delete","contactIds":["YUBjLmNvbQ","YmJAZXhhbXBsZS5jb20"],"confirm":"delete"}'
 
@@ -121,7 +135,7 @@ The admin browser UI is:
 open "http://localhost:3001/waitlist/admin/ui"
 ```
 
-Paste `WAITLIST_ADMIN_TOKEN` into the UI to search, page through results, export, archive with preset reasons, restore archived leads, or bulk archive/restore/delete waitlist contacts without using raw API calls.
+Paste `WAITLIST_ADMIN_TOKEN` into the UI to search, page through results, export, manage lead stages, save private follow-up notes, track next follow-up dates, restore archived leads, or bulk archive/restore/delete/stage waitlist contacts without using raw API calls.
 
 ## Render deployment
 
