@@ -1,0 +1,112 @@
+{
+  "expo": {
+    "name": "SnapMath Academy",
+    "slug": "hamza-academy",
+    "version": "1.0.0",
+    "scheme": "hamzaacademy",
+    "plugins": [
+      "expo-router",
+      "expo-font",
+      "expo-splash-screen",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "SnapMath uses your camera to scan math problems and provide instant step-by-step solutions.",
+          "microphonePermission": false
+        }
+      ],
+      "expo-notifications",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "SnapMath uses your photo library so you can choose a profile picture."
+        }
+      ],
+      "@config-plugins/react-native-blob-util",
+      "@config-plugins/react-native-pdf"
+    ],
+    "newArchEnabled": true,
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.hamzaacademy.app",
+      "buildNumber": "54",
+      "backgroundColor": "#0B0D22",
+      "infoPlist": {
+        "NSCameraUsageDescription": "SnapMath uses your camera to scan math problems and provide instant step-by-step solutions.",
+        "NSUserNotificationsUsageDescription": "SnapMath sends daily practice reminders to help you stay on track for Tawjihi.",
+        "ITSAppUsesNonExemptEncryption": false
+      },
+      "config": {
+        "usesNonExemptEncryption": false
+      }
+    },
+    "android": {
+      "package": "com.hamzaacademy.app",
+      "versionCode": 1,
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.RECEIVE_BOOT_COMPLETED",
+        "android.permission.VIBRATE"
+      ]
+    },
+    "web": {
+      "output": "static"
+    },
+    "description": "SnapMath Academy \u2014 the #1 Grade 12 Tawjihi math prep app. Master calculus, trigonometry, statistics, and more with AI-powered step-by-step solutions, daily practice, and a full exam simulator.",
+    "primaryColor": "#C9A84C",
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "defaultConnection": "tunnel",
+      "appStoreUrl": "https://apps.apple.com/app/snapmath-academy",
+      "playStoreUrl": "https://play.google.com/store/apps/details?id=com.hamzaacademy.app",
+      "supportEmail": "support@snapmathacademy.com",
+      "privacyPolicyUrl": "https://snapmathacademy.com/privacy",
+      "termsUrl": "https://snapmathacademy.com/terms",
+      "socialLinks": {
+        "instagram": "https://www.instagram.com/snapmathacademy",
+        "tiktok": "https://www.tiktok.com/@snapmathacademy",
+        "snapchat": "https://www.snapchat.com/add/snapmathacademy",
+        "youtube": "https://www.youtube.com/@snapmathacademy",
+        "facebook": "https://www.facebook.com/snapmathacademy",
+        "twitter": "https://x.com/snapmathacademy"
+      },
+      "googleIosClientId": "",
+      "googleWebClientId": "",
+      "revenueCatIosApiKey": "",
+      "revenueCatEntitlementId": "premium",
+      "revenueCatOfferingId": "default",
+      "revenueCatProductIds": {
+        "monthly": "snapmath_monthly",
+        "semester": "snapmath_semester",
+        "annual": "snapmath_annual"
+      },
+      "supabaseUrl": "",
+      "supabaseAnonKey": "",
+      "subscriptionPreviewTier": "gold",
+      "managedAiEnabled": true,
+      "managedAiBaseUrl": "https://snapmath-ai-proxy.onrender.com",
+      "managedAiChatPath": "/ai/chat",
+      "managedAiVisionPath": "/ai/vision",
+      "introVideoUrl": "",
+      "welcomeVideoUrl": "",
+      "textbookPdfUrl": "",
+      "founderName": "Hamza Alfasatleh",
+      "founderTitleEn": "Founder & Tawjihi Math Mentor",
+      "founderTitleAr": "\u0627\u0644\u0645\u0624\u0633\u0633 \u0648\u0645\u0631\u0634\u062f \u0631\u064a\u0627\u0636\u064a\u0627\u062a \u0627\u0644\u062a\u0648\u062c\u064a\u0647\u064a",
+      "founderMessageEn": "I built SnapMath Academy to give Jordanian students clear steps, strong practice, and real exam confidence every day.",
+      "founderMessageAr": "\u0628\u0646\u064a\u062a SnapMath Academy \u0644\u064a\u062d\u0635\u0644 \u0637\u0644\u0627\u0628 \u0627\u0644\u0623\u0631\u062f\u0646 \u0639\u0644\u0649 \u0634\u0631\u062d \u0648\u0627\u0636\u062d\u060c \u0648\u062a\u062f\u0631\u064a\u0628 \u0642\u0648\u064a\u060c \u0648\u062b\u0642\u0629 \u062d\u0642\u064a\u0642\u064a\u0629 \u0641\u064a \u0627\u0644\u0627\u0645\u062a\u062d\u0627\u0646 \u0643\u0644 \u064a\u0648\u0645.",
+      "founderImageUrl": "",
+      "router": {
+        "origin": false
+      },
+      "eas": {
+        "projectId": "c2ff215a-cca6-4805-a78f-82c862920239"
+      }
+    },
+    "owner": "zamza"
+  }
+}

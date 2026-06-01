@@ -1,0 +1,48 @@
+name: iOS Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      what_to_test:
+        description: TestFlight "What to Test" notes
+        required: false
+        default: "Focus on the Unit 1 curriculum-to-drill demo path, billing preview messaging, and Arabic/English UI polish."
+      allow_dirty:
+        description: Kept for parity with local flow; CI checkouts are clean by default
+        required: false
+        default: "false"
+
+jobs:
+  release-ios:
+    runs-on: ubuntu-latest
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            landing-page/package-lock.json
+
+      - name: Ensure Expo token exists
+        run: |
+          if [ -z "$EXPO_TOKEN" ]; then
+            echo "Missing EXPO_TOKEN secret."
+            exit 1
+          fi
+
+      - name: Install root dependencies
+        run: npm ci
+
+      - name: Run iOS release flow
+        run: >
+          npm run release:ios --
+          --what-to-test "${{ github.event.inputs.what_to_test }}"
+          --message "GitHub Actions iOS release run ${{ github.run_number }}"

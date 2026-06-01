@@ -1,0 +1,33 @@
+{
+  "cli": {
+    "version": ">= 18.0.6",
+    "appVersionSource": "local"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "ios": {
+        "image": "macos-sequoia-15.6-xcode-26.0"
+      }
+    },
+    "preview": {
+      "distribution": "internal",
+      "ios": {
+        "image": "macos-sequoia-15.6-xcode-26.0"
+      }
+    },
+    "production": {
+      "ios": {
+        "image": "macos-sequoia-15.6-xcode-26.0"
+      }
+    }
+  },
+  "submit": {
+    "production": {
+      "ios": {
+        "ascAppId": "6760658506"
+      }
+    }
+  }
+}

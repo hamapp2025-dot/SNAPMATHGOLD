@@ -1,0 +1,77 @@
+# Dependencies
+node_modules/
+
+# Expo / local caches
+.expo/
+.expo-go-sdk52/
+.expo-export-check/
+.expo-export-check-pdf/
+dist/
+web-build/
+expo-env.d.ts
+
+# IDE / editor
+.cursor/
+.vscode/
+.idea/
+*.sublime-*
+
+# Local env
+.env
+.env.local
+.env.*.local
+
+# Debug / keys
+npm-debug.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.orig.*
+*.log
+
+# OS / VCS
+.DS_Store
+.git/
+
+# Non-app build artifacts
+/manim/
+/media/
+/services/
+/tools/
+/video-previews/
+/.boldvoice_refs/
+/ios/Pods/
+/ios/build/
+
+# Local root captures and archives only
+/*.ipa
+/*.png
+/*.jpg
+/*.jpeg
+/*.gif
+/*.webp
+/*.mov
+/*.mp4
+/*.pdf
+
+# Unused founder media variants
+assets/media/founder/founder-intro.mp4
+assets/media/founder/founder-intro-v2.mp4
+assets/media/founder/founder-welcome.mp4
+assets/media/founder/founder-welcome-poster.jpg
+assets/media/founder/founder-welcome-poster-v2.jpg
+assets/media/founder/founder-welcome-poster-v3.jpg
+
+# Unused intermediate lesson media
+assets/media/lessons/u1-l1-hero.mp4
+assets/media/lessons/u1-l1-hero-subtitled.mp4
+assets/media/lessons/u1-l1-hero-visual.mp4
+assets/media/lessons/u1-l1-hero-voiced.mp4
+assets/media/lessons/u1-l1-intro-source.mp4
+assets/media/lessons/u1-l1-manim-narration.m4a
+assets/media/lessons/u1-l1-simulator-premium-check.png
+assets/media/lessons/u2-l1-hero.mp4
+assets/media/lessons/u3-l3-hero.mp4
+snapmath-testflight-build*.ipa
