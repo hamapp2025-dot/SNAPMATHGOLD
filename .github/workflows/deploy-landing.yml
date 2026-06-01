@@ -3,13 +3,11 @@ name: Deploy Landing Page
 on:
   push:
     branches:
+      - landing-static-deploy
       - main
-      - landing-page-deploy
-      - backup-before-327-rollback-20260519-205118
     paths:
       - landing-page/**
       - render.yaml
-      - scripts/deploy-landing.js
       - .github/workflows/deploy-landing.yml
   workflow_dispatch:
 
@@ -29,7 +27,8 @@ jobs:
           cache-dependency-path: landing-page/package-lock.json
 
       - name: Build static landing page
-        run: npm --prefix landing-page ci && npm run website:build
+        working-directory: landing-page
+        run: npm ci && npm run build
 
       - name: Trigger Render deploy hook
         if: ${{ secrets.RENDER_LANDING_DEPLOY_HOOK_URL }}
