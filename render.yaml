@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: snapmath-landing
+    runtime: static
+    rootDir: landing-page
+    buildCommand: npm ci && npm run build
+    staticPublishPath: out
+    envVars:
+      - key: NODE_VERSION
+        value: 20

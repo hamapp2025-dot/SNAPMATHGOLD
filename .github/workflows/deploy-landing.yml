@@ -1,0 +1,45 @@
+name: Deploy Landing Page
+
+on:
+  push:
+    branches:
+      - main
+      - landing-page-deploy
+      - backup-before-327-rollback-20260519-205118
+    paths:
+      - landing-page/**
+      - render.yaml
+      - scripts/deploy-landing.js
+      - .github/workflows/deploy-landing.yml
+  workflow_dispatch:
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: landing-page/package-lock.json
+
+      - name: Build static landing page
+        run: npm --prefix landing-page ci && npm run website:build
+
+      - name: Trigger Render deploy hook
+        if: ${{ secrets.RENDER_LANDING_DEPLOY_HOOK_URL }}
+        env:
+          RENDER_LANDING_DEPLOY_HOOK_URL: ${{ secrets.RENDER_LANDING_DEPLOY_HOOK_URL }}
+        run: curl -fsS -X POST "$RENDER_LANDING_DEPLOY_HOOK_URL"
+
+      - name: Upload landing artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: snapmath-landing-static
+          path: landing-page/out
+          if-no-files-found: error
