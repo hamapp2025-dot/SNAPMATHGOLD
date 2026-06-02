@@ -14,8 +14,8 @@ type FounderMediaSource = {
 const LOCAL_FOUNDER_MEDIA: FounderMediaSource = {
   founderImage: require('../../assets/media/founder/founder-portrait.jpg'),
   introVideo: require('../../assets/media/founder/founder-intro-v3.mp4'),
-  welcomeVideo: null,
-  welcomePoster: null,
+  welcomeVideo: require('../../assets/media/founder/founder-welcome.mp4'),
+  welcomePoster: require('../../assets/media/founder/founder-welcome-poster-v3.jpg'),
 };
 
 function toRemoteVideoSource(url: string | null): AppVideoSource | null {
@@ -31,7 +31,8 @@ const founderImageSource = LOCAL_FOUNDER_MEDIA.founderImage ?? toRemoteImageSour
 const welcomePosterSource = LOCAL_FOUNDER_MEDIA.welcomePoster;
 const welcomeVideoSource =
   LOCAL_FOUNDER_MEDIA.welcomeVideo ??
-  toRemoteVideoSource(runtimeConfig.welcomeVideoUrl);
+  toRemoteVideoSource(runtimeConfig.welcomeVideoUrl) ??
+  introVideoSource;
 
 export const founderMedia = {
   founderImageSource,

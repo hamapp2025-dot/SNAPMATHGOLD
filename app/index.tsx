@@ -12,8 +12,12 @@ type NextRoute = '/auth' | '/onboarding' | '/(tabs)';
 
 function buildEntryHref(
   nextRoute: NextRoute,
-  options: { welcomeSeen: boolean },
+  options: { welcomeSeen: boolean; introSeen: boolean },
 ): Href {
+  if (!options.introSeen) {
+    return { pathname: '/intro', params: { next: nextRoute } };
+  }
+
   if (nextRoute === '/auth') {
     if (!options.welcomeSeen) {
       return { pathname: '/welcome', params: { next: nextRoute } };
@@ -37,6 +41,7 @@ export default function Index() {
           '@snapmath_onboarding_done',
           '@snapmath_name',
           '@snapmath_seen_welcome',
+          '@snapmath_seen_intro',
         ]);
 
         if (cancelled) return;
@@ -45,6 +50,7 @@ export default function Index() {
         const onboardingDone = map['@snapmath_onboarding_done'] === '1';
         const hasLocalProfile = !!map['@snapmath_name'];
         const welcomeSeen = map['@snapmath_seen_welcome'] === '1';
+        const introSeen = map['@snapmath_seen_intro'] === '1';
 
         let nextRoute: NextRoute;
 
@@ -56,7 +62,7 @@ export default function Index() {
           nextRoute = hasLocalProfile ? '/onboarding' : '/auth';
         }
 
-        setEntryHref(buildEntryHref(nextRoute, { welcomeSeen }));
+        setEntryHref(buildEntryHref(nextRoute, { welcomeSeen, introSeen }));
       } catch {
         if (!cancelled) {
           setEntryHref('/auth');
