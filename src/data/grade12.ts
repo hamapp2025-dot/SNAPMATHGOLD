@@ -218,6 +218,7 @@ export const SEMESTER_1_UNITS: Grade12Unit[] = [
         id: 'u2-l2',
         titleEn: 'Trig Identities (2)',
         titleAr: 'المتطابقات المثلثية (2)',
+        videoId: 'sU2pyMR8GZ4',
         keyFormulas: [
           { label: 'Sum formula sin', formula: 'sin(A+B) = sinA cosB + cosA sinB' },
           { label: 'Sum formula cos', formula: 'cos(A+B) = cosA cosB − sinA sinB' },
@@ -233,6 +234,7 @@ export const SEMESTER_1_UNITS: Grade12Unit[] = [
         id: 'u2-l3',
         titleEn: 'Solving Trig Equations',
         titleAr: 'حل المعادلات المثلثية',
+        videoId: 'eZPEW2hVUd0',
         keyFormulas: [
           { label: 'General solution sin', formula: 'sin θ = k  ⟹  θ = nπ + (−1)ⁿ arcsin k' },
           { label: 'General solution cos', formula: 'cos θ = k  ⟹  θ = 2nπ ± arccos k' },
@@ -275,6 +277,7 @@ export const SEMESTER_1_UNITS: Grade12Unit[] = [
         id: 'u3-l2',
         titleEn: 'Product/Quotient Rules',
         titleAr: 'قاعدتا الضرب والقسمة',
+        videoId: '17X5g9QArTc',
         keyFormulas: [
           { label: 'Product Rule', formula: "(fg)' = f'g + fg'" },
           { label: 'Quotient Rule', formula: "(f/g)' = (f'g − fg') / g²" },
@@ -306,6 +309,7 @@ export const SEMESTER_1_UNITS: Grade12Unit[] = [
         id: 'u3-l4',
         titleEn: 'Implicit Differentiation',
         titleAr: 'التفاضل الضمني',
+        videoId: 'xbviQHhU1rA',
         keyFormulas: [
           { label: 'Implicit', formula: "Differentiate both sides w.r.t. x, treat y as f(x)" },
         ],
@@ -320,6 +324,7 @@ export const SEMESTER_1_UNITS: Grade12Unit[] = [
         id: 'u3-l5',
         titleEn: 'Related Rates',
         titleAr: 'معدلات مترابطة',
+        videoId: 'gBHIZlF0TX8',
         keyFormulas: [
           { label: 'Strategy', formula: 'Relate variables, differentiate w.r.t. time t' },
         ],
@@ -343,6 +348,7 @@ export const SEMESTER_1_UNITS: Grade12Unit[] = [
         id: 'u4-l1',
         titleEn: 'Complex Numbers',
         titleAr: 'الأعداد المركبة',
+        videoId: 'OQz1ydBcQSA',
         keyFormulas: [
           { label: 'Standard form', formula: 'z = a + bi,  i² = −1' },
           { label: 'Modulus', formula: '|z| = √(a² + b²)' },
@@ -358,6 +364,7 @@ export const SEMESTER_1_UNITS: Grade12Unit[] = [
         id: 'u4-l2',
         titleEn: 'Operations on Complex Numbers',
         titleAr: 'العمليات على الأعداد المركبة',
+        videoId: 'OQz1ydBcQSA',
         keyFormulas: [
           { label: 'Multiply', formula: '(a+bi)(c+di) = (ac−bd) + (ad+bc)i' },
           { label: 'Conjugate', formula: 'z̄ = a − bi,  z·z̄ = |z|²' },
@@ -373,6 +380,7 @@ export const SEMESTER_1_UNITS: Grade12Unit[] = [
         id: 'u4-l3',
         titleEn: 'Locus in Complex Plane',
         titleAr: 'المحل الهندسي في مستوى الأعداد المركبة',
+        videoId: 'SP-YJe7Vldo',
         keyFormulas: [
           { label: 'Circle', formula: '|z − z₀| = r  →  circle centre z₀, radius r' },
           { label: 'Line', formula: 'arg(z − z₁) = θ  →  ray from z₁' },
@@ -418,6 +426,7 @@ export const SEMESTER_2_UNITS: Grade12Unit[] = [
         id: 'u5-l2',
         titleEn: 'Integration by Substitution',
         titleAr: 'التكامل بالتعويض',
+        videoId: 'sdYdnpYn-1o',
         keyFormulas: [
           { label: 'Substitution', formula: 'Let u = g(x), du = g\'(x) dx' },
         ],
@@ -432,6 +441,7 @@ export const SEMESTER_2_UNITS: Grade12Unit[] = [
         id: 'u5-l3',
         titleEn: 'Integration by Partial Fractions',
         titleAr: 'التكامل بالكسور الجزئية',
+        videoId: 'GIGJdvdrdhs',
         keyFormulas: [
           { label: 'Method', formula: '∫ A/(x−a) dx = A ln|x−a| + C' },
         ],
@@ -446,6 +456,7 @@ export const SEMESTER_2_UNITS: Grade12Unit[] = [
         id: 'u5-l4',
         titleEn: 'Integration by Parts',
         titleAr: 'التكامل بالتجزئة',
+        videoId: 'sWSLLO3DS1I',
         keyFormulas: [
           { label: 'Integration by Parts', formula: '∫ u dv = uv − ∫ v du' },
         ],
@@ -460,6 +471,7 @@ export const SEMESTER_2_UNITS: Grade12Unit[] = [
         id: 'u5-l5',
         titleEn: 'Areas and Volumes',
         titleAr: 'المساحات والأحجام',
+        videoId: 'UjTTx2eYrx8',
         keyFormulas: [
           { label: 'Area under curve', formula: 'A = ∫[a,b] f(x) dx' },
           { label: 'Volume of revolution', formula: 'V = π ∫[a,b] [f(x)]² dx' },
@@ -475,6 +487,7 @@ export const SEMESTER_2_UNITS: Grade12Unit[] = [
         id: 'u5-l6',
         titleEn: 'Differential Equations',
         titleAr: 'المعادلات التفاضلية',
+        videoId: 'nzqLplhh0DU',
         keyFormulas: [
           { label: 'Separable', formula: 'dy/dx = f(x)g(y)  ⟹  ∫ dy/g(y) = ∫ f(x) dx' },
         ],
@@ -498,6 +511,7 @@ export const SEMESTER_2_UNITS: Grade12Unit[] = [
         id: 'u6-l1',
         titleEn: 'Vectors in Space',
         titleAr: 'المتجهات في الفراغ',
+        videoId: 'EwSHKuSxX_8',
         keyFormulas: [
           { label: 'Magnitude', formula: '|v| = √(x² + y² + z²)' },
           { label: 'Unit vector', formula: 'v̂ = v / |v|' },
@@ -513,6 +527,7 @@ export const SEMESTER_2_UNITS: Grade12Unit[] = [
         id: 'u6-l2',
         titleEn: 'Lines in Space',
         titleAr: 'المستقيمات في الفراغ',
+        videoId: 'MkjazYnvNP8',
         keyFormulas: [
           { label: 'Vector equation', formula: 'r = a + t·d' },
           { label: 'Parametric', formula: 'x = x₀ + td₁,  y = y₀ + td₂,  z = z₀ + td₃' },
@@ -528,6 +543,7 @@ export const SEMESTER_2_UNITS: Grade12Unit[] = [
         id: 'u6-l3',
         titleEn: 'Dot Product',
         titleAr: 'الضرب القياسي',
+        videoId: 'LyGKycYT2v0',
         keyFormulas: [
           { label: 'Dot product', formula: 'a·b = a₁b₁ + a₂b₂ + a₃b₃' },
           { label: 'Angle', formula: 'cos θ = (a·b) / (|a||b|)' },
@@ -552,6 +568,7 @@ export const SEMESTER_2_UNITS: Grade12Unit[] = [
         id: 'u7-l1',
         titleEn: 'Geometric & Binomial Distribution',
         titleAr: 'التوزيع الهندسي وثنائي الحد',
+        videoId: 'UrOXRvG9oYE',
         keyFormulas: [
           { label: 'Binomial P(X=k)', formula: 'C(n,k) · pᵏ · (1−p)ⁿ⁻ᵏ' },
           { label: 'Geometric P(X=k)', formula: '(1−p)ᵏ⁻¹ · p' },

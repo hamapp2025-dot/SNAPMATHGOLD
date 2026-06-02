@@ -31,7 +31,7 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.hamzaacademy.app",
-      "buildNumber": "54",
+      "buildNumber": "55",
       "backgroundColor": "#0B0D22",
       "infoPlist": {
         "NSCameraUsageDescription": "SnapMath uses your camera to scan math problems and provide instant step-by-step solutions.",
