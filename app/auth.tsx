@@ -15,6 +15,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Constants from 'expo-constants';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import * as AppleAuthentication from 'expo-apple-authentication';
 import * as Google from 'expo-auth-session/providers/google';
 import * as WebBrowser from 'expo-web-browser';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -23,6 +24,7 @@ import {
   createUserWithEmailAndPassword,
   sendPasswordResetEmail,
   GoogleAuthProvider,
+  OAuthProvider,
   signInWithEmailAndPassword,
   signInWithCredential,
   signOut,
@@ -315,6 +317,71 @@ function GoogleProviderButton({
   return <ConfiguredGoogleProviderButton {...props} />;
 }
 
+type AppleProviderButtonProps = {
+  theme: AppTheme;
+  isAr: boolean;
+  disabled: boolean;
+  loading: boolean;
+  onLoadingChange: (value: boolean) => void;
+  onAppleCredential: (identityToken: string, fullName?: string | null) => Promise<void>;
+  mapProviderError: (err: any) => string;
+  setError: (value: string | null) => void;
+};
+
+function AppleProviderButton({
+  theme,
+  isAr,
+  disabled,
+  loading,
+  onLoadingChange,
+  onAppleCredential,
+  mapProviderError,
+  setError,
+}: AppleProviderButtonProps) {
+  const handlePress = async () => {
+    setError(null);
+    onLoadingChange(true);
+    try {
+      const result = await AppleAuthentication.signInAsync({
+        requestedScopes: [
+          AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+          AppleAuthentication.AppleAuthenticationScope.EMAIL,
+        ],
+      });
+
+      if (!result.identityToken) {
+        setError(isAr ? 'تعذر الحصول على رمز Apple.' : 'Could not get an Apple sign-in token.');
+        return;
+      }
+
+      const appleName = [result.fullName?.givenName, result.fullName?.familyName]
+        .filter(Boolean)
+        .join(' ')
+        .trim();
+
+      await onAppleCredential(result.identityToken, appleName || null);
+    } catch (error: any) {
+      if (error?.code === 'ERR_REQUEST_CANCELED') {
+        return;
+      }
+      setError(mapProviderError(error));
+    } finally {
+      onLoadingChange(false);
+    }
+  };
+
+  return (
+    <SocialCircleButton
+      theme={theme}
+      icon="logo-apple"
+      label={isAr ? 'المتابعة باستخدام Apple' : 'Continue with Apple'}
+      onPress={handlePress}
+      loading={loading}
+      disabled={disabled}
+    />
+  );
+}
+
 export default function AuthScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ next?: string | string[]; mode?: string | string[] }>();
@@ -334,12 +401,33 @@ export default function AuthScreen() {
   const [showPass, setShowPass] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [providerLoading, setProviderLoading] = useState<'google' | null>(null);
+  const [providerLoading, setProviderLoading] = useState<'google' | 'apple' | null>(null);
+  const [appleSignInAvailable, setAppleSignInAvailable] = useState(false);
   const hasGoogleConfig = !!(GOOGLE_IOS_CLIENT_ID || GOOGLE_WEB_CLIENT_ID);
   const canUseGoogleProvider = hasGoogleConfig;
   const showGoogleProvider = canUseGoogleProvider;
+  const showAppleProvider = Platform.OS === 'ios' && appleSignInAvailable;
   const showFacebookProvider = false;
-  const showProviderSection = showGoogleProvider || showFacebookProvider;
+  const showProviderSection = showGoogleProvider || showAppleProvider || showFacebookProvider;
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function checkAppleAvailability() {
+      if (Platform.OS !== 'ios') return;
+      try {
+        const available = await AppleAuthentication.isAvailableAsync();
+        if (!cancelled) setAppleSignInAvailable(available);
+      } catch {
+        if (!cancelled) setAppleSignInAvailable(false);
+      }
+    }
+
+    void checkAppleAvailability();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     setMode(initialMode);
@@ -438,6 +526,11 @@ export default function AuthScreen() {
 
   const handleGoogleToken = async (idToken: string) => {
     await handleProviderCredential(GoogleAuthProvider.credential(idToken));
+  };
+
+  const handleAppleCredential = async (identityToken: string, fullName?: string | null) => {
+    const provider = new OAuthProvider('apple.com');
+    await handleProviderCredential(provider.credential({ idToken: identityToken }), fullName ?? undefined);
   };
 
   const showProviderAlert = (provider: 'google' | 'facebook') => {
@@ -665,6 +758,19 @@ export default function AuthScreen() {
               {showProviderSection ? (
                 <>
                   <View style={s.socialRow}>
+                    {showAppleProvider ? (
+                      <AppleProviderButton
+                        theme={theme}
+                        isAr={isAr}
+                        disabled={socialAuthDisabled}
+                        loading={providerLoading === 'apple'}
+                        onLoadingChange={(loadingNow) => setProviderLoading(loadingNow ? 'apple' : null)}
+                        onAppleCredential={handleAppleCredential}
+                        mapProviderError={mapProviderError}
+                        setError={setError}
+                      />
+                    ) : null}
+
                     {showGoogleProvider ? (
                       <GoogleProviderButton
                         theme={theme}

@@ -152,8 +152,6 @@ function RankRow({
   );
 }
 
-const MOCK_WEEKLY_NAMES = ['Layla', 'Omar', 'Noor', 'Youssef', 'Hala', 'Kareem', 'Sara', 'Tariq', 'Lina', 'Adam'];
-
 export default function LeaderboardScreen() {
   const router = useRouter();
   const { theme } = useAppTheme();
@@ -238,19 +236,14 @@ export default function LeaderboardScreen() {
 
   const merged: Player[] = useMemo(() => {
     if (tab === 'weekly') {
-      const seed = getWeekStart(new Date(nowTs)).getTime();
-      const mockWeekly = MOCK_WEEKLY_NAMES.map((name, i) => ({
-        uid: `mock-${i}`,
-        name,
-        xp: 80 + ((seed + i * 7919) % 220) + i * 25,
-        streak: 0,
-        avatar: colorForUid(name),
-      }));
-      return [...mockWeekly, meEntry].sort((a, b) => b.xp - a.xp);
+      // Only the signed-in student has locally tracked weekly XP today.
+      return [meEntry];
     }
     const withoutMe = players.filter((p) => p.uid !== myUid && p.name !== displayName);
     return [...withoutMe, meEntry].sort((a, b) => b.xp - a.xp);
-  }, [tab, nowTs, players, meEntry, myUid, displayName]);
+  }, [tab, players, meEntry, myUid, displayName]);
+
+  const showWeeklyInviteNote = tab === 'weekly' && players.length === 0;
 
   const top3 = merged.slice(0, 3);
   const rest = merged.slice(3);
@@ -303,6 +296,17 @@ export default function LeaderboardScreen() {
           </Text>
         </View>
       )}
+
+      {showWeeklyInviteNote ? (
+        <View style={[s.leagueBanner, isAr && s.leagueBannerRtl, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+          <Ionicons name="people-outline" size={18} color={theme.accent} />
+          <Text style={[s.leagueBannerText, isAr && s.leagueBannerTextRtl, { color: theme.muted }]}>
+            {isAr
+              ? 'لوحة الأسبوع تعرض تقدمك الآن. عندما ينضم المزيد من الطلاب ستظهر الترتيبات الحقيقية.'
+              : 'Weekly board shows your progress for now. Real class rankings appear as more students join.'}
+          </Text>
+        </View>
+      ) : null}
 
       {loading && tab === 'all' ? (
         <View style={s.loadingWrap}>

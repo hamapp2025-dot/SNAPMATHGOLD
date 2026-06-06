@@ -21,7 +21,8 @@
     "release:prepare-workdir": "node scripts/release-prepare-workdir.js",
     "release:ios": "node scripts/release-ios.js",
     "release:simulator-smoke": "node scripts/release-simulator-smoke.js",
-    "release:status": "node scripts/release-status.js"
+    "release:status": "node scripts/release-status.js",
+    "billing:setup": "node scripts/setup-billing-env.js"
   },
   "dependencies": {
     "@config-plugins/react-native-blob-util": "^12.0.0",

@@ -28,10 +28,32 @@ export const ONBOARDING_KEY = '@snapmath_onboarding_done';
 
 // ─── Data ────────────────────────────────────────────────────────────────────
 const GRADES = [
-  { id: 'g10', labelEn: 'Grade 10', labelAr: 'الصف العاشر', icon: 'school-outline' },
-  { id: 'g11', labelEn: 'Grade 11', labelAr: 'الصف الحادي عشر', icon: 'school-outline' },
-  { id: 'g12', labelEn: 'Grade 12 · Tawjihi', labelAr: 'الصف الثاني عشر · توجيهي', icon: 'ribbon-outline' },
-];
+  {
+    id: 'g12',
+    labelEn: 'Grade 12 · Tawjihi',
+    labelAr: 'الصف الثاني عشر · توجيهي',
+    icon: 'ribbon-outline',
+    available: true,
+  },
+  {
+    id: 'g11',
+    labelEn: 'Grade 11',
+    labelAr: 'الصف الحادي عشر',
+    icon: 'school-outline',
+    available: false,
+    soonEn: 'Coming soon',
+    soonAr: 'قريباً',
+  },
+  {
+    id: 'g10',
+    labelEn: 'Grade 10',
+    labelAr: 'الصف العاشر',
+    icon: 'school-outline',
+    available: false,
+    soonEn: 'Coming soon',
+    soonAr: 'قريباً',
+  },
+] as const;
 
 const AVATAR_COLORS = ['#0A7AFF', '#2590FF', '#4F8CFF', '#2CC5FF', '#5B8FF9', '#4BC4B5', '#7A88FF'];
 
@@ -147,15 +169,23 @@ function Step1({
       <View style={s.cardList}>
         {GRADES.map((g) => {
           const active = selected === g.id;
+          const disabled = !g.available;
           return (
             <TouchableOpacity
               key={g.id}
               style={[
                 s.gradeCard,
                 isAr && s.gradeCardRtl,
-                { backgroundColor: active ? withAlpha(theme.accent, 0.18) : theme.surface, borderColor: active ? theme.accent : theme.border },
+                {
+                  backgroundColor: active ? withAlpha(theme.accent, 0.18) : theme.surface,
+                  borderColor: active ? theme.accent : theme.border,
+                  opacity: disabled ? 0.55 : 1,
+                },
               ]}
-              onPress={() => onSelect(g.id)}
+              onPress={() => {
+                if (g.available) onSelect(g.id);
+              }}
+              disabled={disabled}
               activeOpacity={0.85}>
               <LinearGradient
                 colors={active ? theme.primary : ['rgba(255,255,255,0.06)', 'rgba(255,255,255,0.03)']}
@@ -166,13 +196,17 @@ function Step1({
                 <Text style={[s.gradeLabel, isAr && s.textRtl, { color: active ? theme.accent : theme.text }]}>
                   {isAr ? g.labelAr : g.labelEn}
                 </Text>
-                {g.id === 'g12' && (
+                {g.id === 'g12' ? (
                   <Text style={[s.gradeSub, isAr && s.textRtl, { color: theme.muted }]}>
                     {t('onboardingGradeTawjihiSub')}
                   </Text>
-                )}
+                ) : disabled ? (
+                  <Text style={[s.gradeSub, isAr && s.textRtl, { color: theme.muted }]}>
+                    {isAr ? g.soonAr : g.soonEn}
+                  </Text>
+                ) : null}
               </View>
-              {active && <Ionicons name="checkmark-circle" size={22} color={theme.accent} />}
+              {active ? <Ionicons name="checkmark-circle" size={22} color={theme.accent} /> : null}
             </TouchableOpacity>
           );
         })}

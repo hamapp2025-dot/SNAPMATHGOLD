@@ -23,7 +23,8 @@
         }
       ],
       "@config-plugins/react-native-blob-util",
-      "@config-plugins/react-native-pdf"
+      "@config-plugins/react-native-pdf",
+      "expo-apple-authentication"
     ],
     "newArchEnabled": true,
     "orientation": "portrait",
@@ -31,7 +32,7 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.hamzaacademy.app",
-      "buildNumber": "56",
+      "buildNumber": "57",
       "backgroundColor": "#0B0D22",
       "infoPlist": {
         "NSCameraUsageDescription": "SnapMath uses your camera to scan math problems and provide instant step-by-step solutions.",
@@ -80,9 +81,9 @@
       "revenueCatEntitlementId": "premium",
       "revenueCatOfferingId": "default",
       "revenueCatProductIds": {
-        "monthly": "snapmath_monthly",
-        "semester": "snapmath_semester",
-        "annual": "snapmath_annual"
+        "bronze": "snapmath_bronze_monthly",
+        "silver": "snapmath_silver_monthly",
+        "gold": "snapmath_gold_monthly"
       },
       "supabaseUrl": "",
       "supabaseAnonKey": "",
