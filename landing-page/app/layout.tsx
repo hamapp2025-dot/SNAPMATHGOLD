@@ -15,6 +15,7 @@ const playfair = Playfair_Display({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://snapmathacademy.com"),
   title: "SnapMath Academy | تطبيق رياضيات توجيهي",
   description:
     "SnapMath Academy is a premium Tawjihi math app with Arabic 3D lessons, AI tutoring, visual explanations, and exam-focused practice.",

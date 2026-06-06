@@ -46,9 +46,13 @@ async function deployLanding() {
     return;
   }
 
+  const repoUrl = 'https://github.com/hamapp2025-dot/SNAPMATHGOLD';
+  const blueprintUrl = `https://dashboard.render.com/blueprint/new?repo=${encodeURIComponent(repoUrl)}`;
+
   console.log('\nLanding page build is ready at landing-page/out');
-  console.log('Render Blueprint service: snapmath-landing (static, publishPath=out)');
-  console.log('Sync blueprint: https://dashboard.render.com/blueprints');
+  console.log('Render static service: snapmath-landing (rootDir=landing-page, publishPath=out)');
+  console.log(`Open Blueprint: ${blueprintUrl}`);
+  console.log('After Apply in Render, add custom domain snapmathacademy.com in the static site settings.');
   console.log('Optional: set RENDER_LANDING_DEPLOY_HOOK_URL to auto-trigger deploys from this script.');
 }
 
