@@ -12,6 +12,7 @@
     "lessons:generate-heroes": "python3 tools/generate_launch_media.py",
     "lessons:sync-media": "node scripts/generate-lesson-media-overrides.js",
     "lessons:pipeline": "node scripts/lessons-pipeline-all.js",
+    "lessons:finish": "node scripts/lessons-pipeline-all.js --force-heroes",
     "deploy:landing": "node scripts/deploy-landing.js",
     "web": "expo start --web",
     "check:landing": "npm --prefix landing-page run lint && npm --prefix landing-page run build",

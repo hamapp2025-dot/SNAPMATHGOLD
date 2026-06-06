@@ -1,10 +1,15 @@
 from __future__ import annotations
 
+import argparse
 import math
+import shutil
+import subprocess
+import tempfile
 from pathlib import Path
 
 import arabic_reshaper
 import imageio.v2 as imageio
+import imageio_ffmpeg
 import numpy as np
 from bidi.algorithm import get_display
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
@@ -17,6 +22,10 @@ LESSONS_DIR = ROOT / "assets" / "media" / "lessons"
 WIDTH = 1080
 HEIGHT = 1920
 FPS = 24
+LESSON_DURATION_SEC = 48.0
+PREMIUM_MIN_BYTES = 10_000_000
+FFMPEG = imageio_ffmpeg.get_ffmpeg_exe()
+SAY_VOICE = "Majed"
 
 BG = (11, 13, 34)
 SURFACE = (26, 31, 62)
@@ -219,6 +228,20 @@ def render_founder_welcome(t: float) -> Image.Image:
 
 def render_lesson_video(title_en: str, title_ar: str, formula: str, tagline_en: str, step_labels: list[str], accent_shift: float):
     def renderer(t: float) -> Image.Image:
+        # Four acts across the lesson: hook, formula, example, practice.
+        if t < 0.22:
+            phase_t = ease_out_cubic(t / 0.22)
+            act = 0
+        elif t < 0.52:
+            phase_t = ease_in_out((t - 0.22) / 0.30)
+            act = 1
+        elif t < 0.78:
+            phase_t = ease_in_out((t - 0.52) / 0.26)
+            act = 2
+        else:
+            phase_t = ease_in_out((t - 0.78) / 0.22)
+            act = 3
+
         base = add_brand_shell(make_base_canvas(), progress_t=ease_in_out(t))
         draw = ImageDraw.Draw(base)
 
@@ -230,29 +253,109 @@ def render_lesson_video(title_en: str, title_ar: str, formula: str, tagline_en: 
         base = Image.alpha_composite(base, orb)
         draw = ImageDraw.Draw(base)
 
-        draw.rounded_rectangle((88, 120, 320, 186), radius=24, fill=(255, 255, 255, 14), outline=(255, 255, 255, 18), width=2)
-        draw_left(draw, "Lesson hero", FONT_TINY, 118, 138, TEXT)
+        act_labels = ["Coach intro", "Core rule", "Worked example", "Practice push"]
+        draw.rounded_rectangle((88, 120, 360, 186), radius=24, fill=(255, 255, 255, 14), outline=(255, 255, 255, 18), width=2)
+        draw_left(draw, act_labels[act], FONT_TINY, 118, 138, TEXT)
 
-        draw_centered(draw, title_en, FONT_SUBTITLE, 300, TEXT)
-        draw_centered(draw, title_ar, FONT_BODY, 364, (234, 227, 209), rtl=True)
+        title_y = int(280 - (1 - phase_t) * 24) if act == 0 else 280
+        title_alpha = 1.0 if act == 0 else 0.92
+        draw_centered(draw, title_en, FONT_SUBTITLE, title_y, TEXT)
+        draw_centered(draw, title_ar, FONT_BODY, title_y + 64, (234, 227, 209), rtl=True)
 
-        draw.rounded_rectangle((90, 470, WIDTH - 90, 700), radius=42, fill=(20, 26, 52, 228), outline=(255, 255, 255, 18), width=2)
-        draw_centered(draw, formula, FONT_TITLE, 548, ACCENT)
-        draw_centered(draw, tagline_en, FONT_SMALL, 642, MUTED)
+        formula_y = int(500 - (1 - phase_t) * 30) if act == 1 else 500
+        example_y = int(640 - (1 - phase_t) * 24) if act == 2 else 640
+        draw.rounded_rectangle((90, 430, WIDTH - 90, 760), radius=42, fill=(20, 26, 52, 228), outline=(255, 255, 255, 18), width=2)
 
-        chips_y = 830
+        if act <= 1:
+            draw_centered(draw, formula, FONT_TITLE if act == 1 else FONT_BODY, formula_y, ACCENT if act == 1 else MUTED)
+        if act >= 2:
+            draw_centered(draw, tagline_en[:90], FONT_SMALL, example_y, TEXT if act == 2 else MUTED)
+
+        chips_y = 860
         for idx, label in enumerate(step_labels):
             chip_x = 110 + idx * 290
-            draw.rounded_rectangle((chip_x, chips_y, chip_x + 250, chips_y + 74), radius=26, fill=(255, 255, 255, 16))
-            draw_centered(draw, label, FONT_TINY, chips_y + 22, TEXT)
+            active = act == 3 and idx == min(int(phase_t * len(step_labels)), len(step_labels) - 1)
+            fill = (ACCENT[0], ACCENT[1], ACCENT[2], 220 if active else 40)
+            draw.rounded_rectangle((chip_x, chips_y, chip_x + 250, chips_y + 74), radius=26, fill=fill)
+            draw_centered(draw, label, FONT_TINY, chips_y + 22, INK if active else TEXT)
 
-        draw_centered(draw, "Jordan-first notation • Worked example • Practice", FONT_SMALL, 1010, (223, 226, 234))
+        footer = [
+            "Jordan Grade 12 • Visual first • Exam confidence",
+            "Learn the rule • See the example • Train now",
+            "Step-by-step worked example • Book-aligned notation",
+            "Quick checks below • Master the idea today",
+        ][act]
+        draw_centered(draw, footer, FONT_SMALL, 1010, (223, 226, 234))
         return base
 
     return renderer
 
 
-def lesson_videos():
+def narration_script_ar(lesson: dict) -> str:
+    title_ar = lesson["titleAr"]
+    formula = lesson.get("formula") or lesson["titleEn"]
+    tagline = lesson.get("taglineEn") or ""
+    return (
+        f"مرحباً بك في درس {title_ar}. "
+        f"اليوم سنركز على القاعدة: {formula}. "
+        f"{tagline}. "
+        "أولاً نثبت الفكرة الأساسية بصرياً، ثم نحل مثالاً محلولاً خطوة بخطوة، "
+        "وبعدها ننتقل مباشرة إلى أسئلة تدريب سريعة لتثبيت الفهم قبل الامتحان."
+    )
+
+
+def run_ffmpeg(*args: str) -> None:
+    command = [FFMPEG, *args]
+    subprocess.run(command, check=True)
+
+
+def synthesize_narration(text: str, output_wav: Path) -> None:
+    output_wav.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix="snapmath-tts-") as temp_dir:
+        temp_aiff = Path(temp_dir) / "narration.aiff"
+        subprocess.run(["say", "-v", SAY_VOICE, "-r", "165", "-o", str(temp_aiff), text], check=True)
+        run_ffmpeg("-y", "-i", str(temp_aiff), "-ac", "2", "-ar", "48000", str(output_wav))
+
+
+def mux_narration(video_path: Path, narration_wav: Path, output_path: Path) -> None:
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    run_ffmpeg(
+        "-y",
+        "-i",
+        str(video_path),
+        "-i",
+        str(narration_wav),
+        "-filter_complex",
+        f"[1:a]apad,atrim=0:{LESSON_DURATION_SEC}[outa]",
+        "-map",
+        "0:v:0",
+        "-map",
+        "[outa]",
+        "-t",
+        str(LESSON_DURATION_SEC),
+        "-c:v",
+        "libx264",
+        "-preset",
+        "medium",
+        "-crf",
+        "20",
+        "-pix_fmt",
+        "yuv420p",
+        "-c:a",
+        "aac",
+        "-b:a",
+        "192k",
+        "-movflags",
+        "+faststart",
+        str(output_path),
+    )
+
+
+def is_premium_asset(path: Path) -> bool:
+    return path.exists() and path.stat().st_size >= PREMIUM_MIN_BYTES
+
+
+def lesson_videos(force: bool = False, with_voice: bool = True):
     catalog_path = ROOT / "tools" / "lesson_hero_catalog.json"
     if not catalog_path.exists():
         raise SystemExit(f"Missing catalog: {catalog_path}")
@@ -260,11 +363,19 @@ def lesson_videos():
     import json
 
     catalog = json.loads(catalog_path.read_text(encoding="utf-8"))
+    generated = 0
     for index, lesson in enumerate(catalog):
         lesson_id = lesson["id"]
-        filename = f"{lesson_id}-hero.mp4"
-        target = LESSONS_DIR / filename
-        if target.exists() and target.stat().st_size > 0:
+        voiced_target = LESSONS_DIR / f"{lesson_id}-hero-subtitled-voiced.mp4"
+        subtitled_target = LESSONS_DIR / f"{lesson_id}-hero-subtitled.mp4"
+        hero_target = LESSONS_DIR / f"{lesson_id}-hero.mp4"
+
+        if is_premium_asset(voiced_target):
+            print(f"Skipping premium lesson asset: {voiced_target.name}")
+            continue
+
+        if not force and is_premium_asset(subtitled_target):
+            print(f"Skipping premium lesson asset: {subtitled_target.name}")
             continue
 
         title_en = lesson["titleEn"]
@@ -275,17 +386,53 @@ def lesson_videos():
         shift = (index % 10) * 0.07
 
         write_video(
-            target,
-            duration_sec=9.0,
+            hero_target,
+            duration_sec=LESSON_DURATION_SEC,
             render_frame=render_lesson_video(title_en, title_ar, formula, tagline, chips, shift),
         )
 
+        if with_voice:
+            with tempfile.TemporaryDirectory(prefix=f"{lesson_id}-voice-") as temp_dir:
+                temp_root = Path(temp_dir)
+                narration_wav = temp_root / "narration.wav"
+                synthesize_narration(narration_script_ar(lesson), narration_wav)
+                mux_narration(hero_target, narration_wav, voiced_target)
+                shutil.copy2(voiced_target, subtitled_target)
+        else:
+            shutil.copy2(hero_target, subtitled_target)
+
+        generated += 1
+        print(f"Finished lesson video: {lesson_id}")
+
+    print(f"Generated {generated} finished lesson videos.")
+
+
+def maybe_write_founder_videos(force: bool = False) -> None:
+    intro_v3 = FOUNDER_DIR / "founder-intro-v3.mp4"
+    targets = [
+        (FOUNDER_DIR / "founder-intro.mp4", 7.5, render_founder_intro),
+        (FOUNDER_DIR / "founder-welcome.mp4", 8.5, render_founder_welcome),
+    ]
+    for path, duration, renderer in targets:
+        if intro_v3.exists() and path.name == "founder-intro.mp4":
+            continue
+        if not force and path.exists() and path.stat().st_size > 500_000:
+            continue
+        write_video(path, duration_sec=duration, render_frame=renderer)
+
 
 def main():
-    founder_portrait()
-    write_video(FOUNDER_DIR / "founder-intro.mp4", duration_sec=7.5, render_frame=render_founder_intro)
-    write_video(FOUNDER_DIR / "founder-welcome.mp4", duration_sec=8.5, render_frame=render_founder_welcome)
-    lesson_videos()
+    parser = argparse.ArgumentParser(description="Generate SnapMath founder and finished lesson videos.")
+    parser.add_argument("--force", action="store_true", help="Regenerate lesson videos even when placeholders exist.")
+    parser.add_argument("--lessons-only", action="store_true", help="Skip founder portrait and welcome clips.")
+    parser.add_argument("--no-voice", action="store_true", help="Generate visual-only lesson videos.")
+    args = parser.parse_args()
+
+    if not args.lessons_only:
+        founder_portrait()
+        maybe_write_founder_videos(force=args.force)
+
+    lesson_videos(force=args.force, with_voice=not args.no_voice)
     print("Generated founder and lesson media assets.")
 
 

@@ -45,7 +45,11 @@ async function runLessonsPipeline(flags = {}) {
   console.log('Updated tools/lesson_hero_catalog.json');
 
   if (flags['skip-heroes'] !== true) {
-    run('python3', ['tools/generate_launch_media.py'], {
+    const heroArgs = ['tools/generate_launch_media.py', '--lessons-only'];
+    if (flags['force-heroes'] === true) {
+      heroArgs.push('--force');
+    }
+    run('python3', heroArgs, {
       cwd: PROJECT_ROOT,
       stdio: 'inherit',
     });

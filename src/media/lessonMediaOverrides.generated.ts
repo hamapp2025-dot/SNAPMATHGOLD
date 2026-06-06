@@ -6,72 +6,72 @@ export const LESSON_MEDIA_ASSET_OVERRIDES = {
     posterSource: require('../../assets/media/lessons/u1-l1-poster.jpg'),
   },
   'u1-l2': {
-    heroVideoSource: require('../../assets/media/lessons/u1-l2-hero.mp4'),
+    heroVideoSource: require('../../assets/media/lessons/u1-l2-hero-subtitled-voiced.mp4'),
   },
   'u2-l1': {
-    heroVideoSource: require('../../assets/media/lessons/u2-l1-hero-subtitled.mp4'),
+    heroVideoSource: require('../../assets/media/lessons/u2-l1-hero-subtitled-voiced.mp4'),
   },
   'u2-l2': {
-    heroVideoSource: require('../../assets/media/lessons/u2-l2-hero.mp4'),
+    heroVideoSource: require('../../assets/media/lessons/u2-l2-hero-subtitled-voiced.mp4'),
   },
   'u2-l3': {
-    heroVideoSource: require('../../assets/media/lessons/u2-l3-hero.mp4'),
+    heroVideoSource: require('../../assets/media/lessons/u2-l3-hero-subtitled-voiced.mp4'),
   },
   'u3-l1': {
-    heroVideoSource: require('../../assets/media/lessons/u3-l1-hero.mp4'),
+    heroVideoSource: require('../../assets/media/lessons/u3-l1-hero-subtitled-voiced.mp4'),
   },
   'u3-l2': {
-    heroVideoSource: require('../../assets/media/lessons/u3-l2-hero.mp4'),
+    heroVideoSource: require('../../assets/media/lessons/u3-l2-hero-subtitled-voiced.mp4'),
   },
   'u3-l3': {
-    heroVideoSource: require('../../assets/media/lessons/u3-l3-hero-subtitled.mp4'),
+    heroVideoSource: require('../../assets/media/lessons/u3-l3-hero-subtitled-voiced.mp4'),
   },
   'u3-l4': {
-    heroVideoSource: require('../../assets/media/lessons/u3-l4-hero.mp4'),
+    heroVideoSource: require('../../assets/media/lessons/u3-l4-hero-subtitled-voiced.mp4'),
   },
   'u3-l5': {
-    heroVideoSource: require('../../assets/media/lessons/u3-l5-hero.mp4'),
+    heroVideoSource: require('../../assets/media/lessons/u3-l5-hero-subtitled-voiced.mp4'),
   },
   'u4-l1': {
-    heroVideoSource: require('../../assets/media/lessons/u4-l1-hero.mp4'),
+    heroVideoSource: require('../../assets/media/lessons/u4-l1-hero-subtitled-voiced.mp4'),
   },
   'u4-l2': {
-    heroVideoSource: require('../../assets/media/lessons/u4-l2-hero.mp4'),
+    heroVideoSource: require('../../assets/media/lessons/u4-l2-hero-subtitled-voiced.mp4'),
   },
   'u4-l3': {
-    heroVideoSource: require('../../assets/media/lessons/u4-l3-hero.mp4'),
+    heroVideoSource: require('../../assets/media/lessons/u4-l3-hero-subtitled-voiced.mp4'),
   },
   'u5-l1': {
-    heroVideoSource: require('../../assets/media/lessons/u5-l1-hero.mp4'),
+    heroVideoSource: require('../../assets/media/lessons/u5-l1-hero-subtitled-voiced.mp4'),
   },
   'u5-l2': {
-    heroVideoSource: require('../../assets/media/lessons/u5-l2-hero.mp4'),
+    heroVideoSource: require('../../assets/media/lessons/u5-l2-hero-subtitled-voiced.mp4'),
   },
   'u5-l3': {
-    heroVideoSource: require('../../assets/media/lessons/u5-l3-hero.mp4'),
+    heroVideoSource: require('../../assets/media/lessons/u5-l3-hero-subtitled-voiced.mp4'),
   },
   'u5-l4': {
-    heroVideoSource: require('../../assets/media/lessons/u5-l4-hero.mp4'),
+    heroVideoSource: require('../../assets/media/lessons/u5-l4-hero-subtitled-voiced.mp4'),
   },
   'u5-l5': {
-    heroVideoSource: require('../../assets/media/lessons/u5-l5-hero.mp4'),
+    heroVideoSource: require('../../assets/media/lessons/u5-l5-hero-subtitled-voiced.mp4'),
   },
   'u5-l6': {
-    heroVideoSource: require('../../assets/media/lessons/u5-l6-hero.mp4'),
+    heroVideoSource: require('../../assets/media/lessons/u5-l6-hero-subtitled-voiced.mp4'),
   },
   'u6-l1': {
-    heroVideoSource: require('../../assets/media/lessons/u6-l1-hero.mp4'),
+    heroVideoSource: require('../../assets/media/lessons/u6-l1-hero-subtitled-voiced.mp4'),
   },
   'u6-l2': {
-    heroVideoSource: require('../../assets/media/lessons/u6-l2-hero.mp4'),
+    heroVideoSource: require('../../assets/media/lessons/u6-l2-hero-subtitled-voiced.mp4'),
   },
   'u6-l3': {
-    heroVideoSource: require('../../assets/media/lessons/u6-l3-hero.mp4'),
+    heroVideoSource: require('../../assets/media/lessons/u6-l3-hero-subtitled-voiced.mp4'),
   },
   'u7-l1': {
-    heroVideoSource: require('../../assets/media/lessons/u7-l1-hero.mp4'),
+    heroVideoSource: require('../../assets/media/lessons/u7-l1-hero-subtitled-voiced.mp4'),
   },
   'u7-l2': {
-    heroVideoSource: require('../../assets/media/lessons/u7-l2-hero.mp4'),
+    heroVideoSource: require('../../assets/media/lessons/u7-l2-hero-subtitled-voiced.mp4'),
   },
 } as const;
