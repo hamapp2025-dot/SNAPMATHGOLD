@@ -692,17 +692,17 @@ export function SnapMathLanding() {
   return (
     <div
       dir={direction}
-      className="relative overflow-x-hidden bg-[#0A0A0A] text-white selection:bg-[#BFA044] selection:text-black"
+      className="relative overflow-x-hidden bg-background text-white selection:bg-accent selection:text-background"
     >
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
         <div className="hero-orb hero-orb-1" />
         <div className="hero-orb hero-orb-2" />
         <div className="hero-orb hero-orb-3" />
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(191,160,68,0.12),transparent_35%),radial-gradient(circle_at_bottom,rgba(191,160,68,0.1),transparent_28%)]" />
+        <div className="page-glow absolute inset-0" />
         <div className="grain-overlay" />
       </div>
 
-      <header className="sticky top-0 z-50 border-b border-white/10 bg-[#0A0A0A]/75 backdrop-blur-xl">
+      <header className="sticky top-0 z-50 border-b border-white/10 bg-background/75 backdrop-blur-xl">
         <div
           className={`mx-auto flex max-w-7xl items-center justify-between gap-4 px-6 py-4 ${
             isArabic ? "flex-row-reverse" : "flex-row"
@@ -734,7 +734,7 @@ export function SnapMathLanding() {
                 <a
                   key={item.href}
                   href={item.href}
-                  className="text-sm text-white/70 transition hover:text-[#F5E7A6]"
+                  className="text-sm text-white/70 transition hover:text-accent-light"
                 >
                   {copyFor(locale, item.label)}
                 </a>
@@ -744,17 +744,17 @@ export function SnapMathLanding() {
             <button
               type="button"
               onClick={() => setLocale((current) => (current === "ar" ? "en" : "ar"))}
-              className={`inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-4 py-2 text-sm text-white/80 transition hover:border-[#BFA044]/60 hover:text-white ${
+              className={`inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-4 py-2 text-sm text-white/80 transition hover:border-accent/60 hover:text-white ${
                 isArabic ? "flex-row-reverse" : ""
               }`}
             >
-              <Languages className="h-4 w-4 text-[#BFA044]" />
+              <Languages className="h-4 w-4 text-accent" />
               {isArabic ? "English" : "العربية"}
             </button>
 
             <a
               href={launchInterestHref}
-              className={`inline-flex items-center gap-2 rounded-full bg-[#BFA044] px-4 py-2 text-sm font-semibold text-black transition hover:scale-[1.02] hover:bg-[#d8ba59] ${
+              className={`inline-flex items-center gap-2 rounded-full bg-accent px-4 py-2 text-sm font-semibold text-white transition hover:scale-[1.02] hover:bg-accent-hover ${
                 isArabic ? "flex-row-reverse" : ""
               }`}
             >
@@ -778,7 +778,7 @@ export function SnapMathLanding() {
               className={textAlign}
             >
               <div
-                className={`inline-flex items-center gap-2 rounded-full border border-[#BFA044]/30 bg-[#BFA044]/8 px-4 py-2 text-sm text-[#F5E7A6] ${
+                className={`inline-flex items-center gap-2 rounded-full border border-accent/30 bg-accent/10 px-4 py-2 text-sm text-accent-light ${
                   isArabic ? "flex-row-reverse" : ""
                 }`}
               >
@@ -807,7 +807,7 @@ export function SnapMathLanding() {
               >
                 <a
                   href={launchInterestHref}
-                  className={`inline-flex items-center justify-center gap-2 rounded-full bg-[#BFA044] px-6 py-3 text-base font-semibold text-black transition hover:scale-[1.02] hover:bg-[#d8ba59] ${
+                  className={`inline-flex items-center justify-center gap-2 rounded-full bg-accent px-6 py-3 text-base font-semibold text-white transition hover:scale-[1.02] hover:bg-accent-hover ${
                     isArabic ? "flex-row-reverse" : ""
                   }`}
                 >
@@ -816,11 +816,11 @@ export function SnapMathLanding() {
                 </a>
                 <a
                   href="#demo"
-                  className={`inline-flex items-center justify-center gap-2 rounded-full border border-white/15 bg-white/5 px-6 py-3 text-base font-semibold text-white transition hover:border-[#BFA044]/50 hover:bg-white/10 ${
+                  className={`inline-flex items-center justify-center gap-2 rounded-full border border-white/15 bg-white/5 px-6 py-3 text-base font-semibold text-white transition hover:border-accent/50 hover:bg-white/10 ${
                     isArabic ? "flex-row-reverse" : ""
                   }`}
                 >
-                  <PlayCircle className="h-5 w-5 text-[#BFA044]" />
+                  <PlayCircle className="h-5 w-5 text-accent" />
                   {heroContent.secondaryCta}
                 </a>
               </div>
@@ -829,7 +829,7 @@ export function SnapMathLanding() {
                 {heroContent.stats.map((stat) => (
                   <div
                     key={stat}
-                    className="rounded-3xl border border-white/10 bg-white/5 px-4 py-4 text-sm text-white/75 shadow-[0_0_80px_rgba(191,160,68,0.04)]"
+                    className="rounded-3xl border border-white/10 bg-white/5 px-4 py-4 text-sm text-white/75 shadow-accent-xs"
                   >
                     {stat}
                   </div>
@@ -843,10 +843,10 @@ export function SnapMathLanding() {
               transition={{ duration: 0.9, delay: 0.1, ease: [0.22, 1, 0.36, 1] }}
               className="relative"
             >
-              <div className="absolute inset-x-8 top-6 h-72 rounded-full bg-[#BFA044]/20 blur-3xl" />
+              <div className="absolute inset-x-8 top-6 h-72 rounded-full bg-accent/20 blur-3xl" />
               <div className="relative mx-auto max-w-md rounded-[2rem] border border-white/10 bg-white/5 p-4 shadow-[0_30px_100px_rgba(0,0,0,0.45)] backdrop-blur-md">
-                <div className="rounded-[1.6rem] border border-white/10 bg-[#111111] p-4">
-                  <div className="rounded-[1.4rem] border border-[#BFA044]/20 bg-[linear-gradient(180deg,rgba(191,160,68,0.18),rgba(10,10,10,0.96))] p-5">
+                <div className="rounded-[1.6rem] border border-white/10 bg-surface p-4">
+                  <div className="gradient-phone rounded-[1.4rem] border border-accent/20 p-5">
                     <div
                       className={`flex items-center justify-between gap-4 ${isArabic ? "flex-row-reverse" : ""}`}
                     >
@@ -858,16 +858,16 @@ export function SnapMathLanding() {
                           {isArabic ? "واجهة مصممة للطالب" : "Built for students"}
                         </h2>
                       </div>
-                      <div className="rounded-2xl border border-white/15 bg-black/35 px-3 py-2 text-sm text-[#F5E7A6]">
+                      <div className="rounded-2xl border border-white/15 bg-black/35 px-3 py-2 text-sm text-accent-light">
                         {isArabic ? "تطبيق iPhone" : "iPhone App"}
                       </div>
                     </div>
 
                     <div className="mt-6 grid gap-4">
                       <div className="rounded-[1.4rem] border border-white/10 bg-black/30 p-4">
-                        <div className="mb-4 h-3 w-24 rounded-full bg-[#BFA044]/60" />
+                        <div className="mb-4 h-3 w-24 rounded-full bg-accent/60" />
                         <div className="grid gap-3">
-                          <div className="h-24 rounded-3xl border border-[#BFA044]/20 bg-[radial-gradient(circle_at_top,rgba(191,160,68,0.16),rgba(17,17,17,0.94))]" />
+                          <div className="mockup-radial h-24 rounded-3xl border border-accent/20" />
                           <div className="grid grid-cols-2 gap-3">
                             <div className="h-24 rounded-3xl border border-white/10 bg-white/5" />
                             <div className="h-24 rounded-3xl border border-white/10 bg-white/5" />
@@ -886,7 +886,7 @@ export function SnapMathLanding() {
                           <p className="text-sm text-white/55">
                             {isArabic ? "التقدّم" : "Progress"}
                           </p>
-                          <p className="mt-2 text-2xl font-semibold text-[#F5E7A6]">82%</p>
+                          <p className="mt-2 text-2xl font-semibold text-accent-light">82%</p>
                         </div>
                       </div>
                     </div>
@@ -917,13 +917,13 @@ export function SnapMathLanding() {
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true, amount: 0.2 }}
                   transition={{ duration: 0.65, delay: index * 0.08 }}
-                  className="rounded-[2rem] border border-white/10 bg-white/5 p-6 shadow-[0_0_100px_rgba(191,160,68,0.04)]"
+                  className="rounded-[2rem] border border-white/10 bg-white/5 p-6 shadow-accent-sm"
                 >
                   <div
                     className={`flex items-start justify-between gap-4 ${isArabic ? "flex-row-reverse" : ""}`}
                   >
-                    <div className={`rounded-2xl border border-[#BFA044]/30 bg-[#BFA044]/12 p-3`}>
-                      <Icon className="h-6 w-6 text-[#F5E7A6]" />
+                    <div className={`rounded-2xl border border-accent/30 bg-accent/12 p-3`}>
+                      <Icon className="h-6 w-6 text-accent-light" />
                     </div>
                     <span className="rounded-full border border-white/10 bg-black/25 px-3 py-1 text-xs uppercase tracking-[0.2em] text-white/55">
                       {copyFor(locale, card.stat)}
@@ -964,13 +964,13 @@ export function SnapMathLanding() {
                   viewport={{ once: true, amount: 0.16 }}
                   transition={{ duration: 0.65, delay: index * 0.05 }}
                   whileHover={{ y: -6 }}
-                  className="group rounded-[2rem] border border-white/10 bg-white/5 p-6 transition duration-300 hover:border-[#BFA044]/40 hover:shadow-[0_0_0_1px_rgba(191,160,68,0.25),0_0_80px_rgba(191,160,68,0.14)]"
+                  className="group rounded-[2rem] border border-white/10 bg-white/5 p-6 transition duration-300 hover:border-accent/40 shadow-accent-hover"
                 >
                   <div
                     className={`flex items-center gap-3 ${isArabic ? "flex-row-reverse justify-end" : ""}`}
                   >
-                    <div className="rounded-2xl border border-[#BFA044]/30 bg-[#BFA044]/10 p-3">
-                      <Icon className="h-6 w-6 text-[#F5E7A6]" />
+                    <div className="rounded-2xl border border-accent/30 bg-accent/10 p-3">
+                      <Icon className="h-6 w-6 text-accent-light" />
                     </div>
                     <h3 className={`text-2xl font-semibold text-white ${headingClass} ${textAlign}`}>
                       {copyFor(locale, feature.title)}
@@ -981,10 +981,10 @@ export function SnapMathLanding() {
                     {copyFor(locale, feature.body)}
                   </p>
 
-                  <div className="mt-6 rounded-[1.8rem] border border-white/10 bg-[#0f0f0f] p-4">
-                    <div className="rounded-[1.5rem] border border-[#BFA044]/20 bg-[linear-gradient(180deg,rgba(191,160,68,0.12),rgba(12,12,12,0.92))] p-5">
+                  <div className="mt-6 rounded-[1.8rem] border border-white/10 bg-surface-elevated p-4">
+                    <div className="gradient-mockup rounded-[1.5rem] border border-accent/20 p-5">
                       <div className="mb-4 flex items-center justify-between">
-                        <div className="h-3 w-16 rounded-full bg-[#BFA044]/55" />
+                        <div className="h-3 w-16 rounded-full bg-accent/55" />
                         <div className="h-3 w-10 rounded-full bg-white/15" />
                       </div>
                       <div className="space-y-3">
@@ -994,7 +994,7 @@ export function SnapMathLanding() {
                           <div className="h-14 rounded-2xl border border-white/10 bg-black/25" />
                         </div>
                       </div>
-                      <p className={`mt-4 text-sm text-[#F5E7A6] ${textAlign}`}>
+                      <p className={`mt-4 text-sm text-accent-light ${textAlign}`}>
                         {copyFor(locale, feature.mockup)}
                       </p>
                     </div>
@@ -1022,9 +1022,9 @@ export function SnapMathLanding() {
             whileInView={{ opacity: 1, scale: 1 }}
             viewport={{ once: true, amount: 0.2 }}
             transition={{ duration: 0.75 }}
-            className="mt-10 rounded-[2.2rem] border border-white/10 bg-white/5 p-4 shadow-[0_0_120px_rgba(191,160,68,0.08)]"
+            className="mt-10 rounded-[2.2rem] border border-white/10 bg-white/5 p-4 shadow-accent-md"
           >
-            <div className="relative aspect-video overflow-hidden rounded-[1.8rem] border border-[#BFA044]/20 bg-black">
+            <div className="relative aspect-video overflow-hidden rounded-[1.8rem] border border-accent/20 bg-black">
               <video
                 controls
                 playsInline
@@ -1035,7 +1035,7 @@ export function SnapMathLanding() {
                 <source src={lessonDemoVideoUrl} type="video/mp4" />
               </video>
               <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-[linear-gradient(180deg,transparent,rgba(0,0,0,0.88))] px-6 py-5">
-                <p className={`text-sm uppercase tracking-[0.25em] text-[#F5E7A6] ${textAlign}`}>
+                <p className={`text-sm uppercase tracking-[0.25em] text-accent-light ${textAlign}`}>
                   {isArabic ? "عرض فعلي من الدرس" : "Real lesson preview"}
                 </p>
                 <p className={`mt-2 max-w-2xl text-sm leading-7 text-white/72 ${textAlign}`}>
@@ -1076,7 +1076,7 @@ export function SnapMathLanding() {
                       </p>
                     </div>
                     <ChevronDown
-                      className={`h-5 w-5 text-[#F5E7A6] transition ${isOpen ? "rotate-180" : ""}`}
+                      className={`h-5 w-5 text-accent-light transition ${isOpen ? "rotate-180" : ""}`}
                     />
                   </button>
 
@@ -1092,7 +1092,7 @@ export function SnapMathLanding() {
                             key={copyFor(locale, unit)}
                             className={`flex items-start gap-3 rounded-3xl border border-white/10 bg-black/20 p-4 ${isArabic ? "flex-row-reverse" : ""}`}
                           >
-                            <span className="mt-1 rounded-full bg-[#BFA044] p-1 text-black">
+                            <span className="mt-1 rounded-full bg-accent p-1 text-white">
                               <Check className="h-3.5 w-3.5" />
                             </span>
                             <p className={`text-base leading-8 text-white/75 ${textAlign}`}>
@@ -1126,13 +1126,13 @@ export function SnapMathLanding() {
                 whileHover={{ y: -6 }}
                 className={`relative rounded-[2rem] border p-6 transition ${
                   tier.featured
-                    ? "border-[#BFA044]/60 bg-[linear-gradient(180deg,rgba(191,160,68,0.16),rgba(16,16,16,0.98))] shadow-[0_0_100px_rgba(191,160,68,0.18)]"
+                    ? "gradient-featured border-accent/60 shadow-accent-lg"
                     : "border-white/10 bg-white/5"
                 }`}
               >
                 {tier.badge ? (
                   <div
-                    className={`absolute ${isArabic ? "left-5" : "right-5"} top-5 rounded-full bg-[#BFA044] px-3 py-1 text-xs font-semibold text-black`}
+                    className={`absolute ${isArabic ? "left-5" : "right-5"} top-5 rounded-full bg-accent px-3 py-1 text-xs font-semibold text-white`}
                   >
                     {copyFor(locale, tier.badge)}
                   </div>
@@ -1152,8 +1152,8 @@ export function SnapMathLanding() {
                   href={subscriptionInterestHref}
                   className={`mt-8 inline-flex w-full items-center justify-center gap-2 rounded-full px-5 py-3 text-base font-semibold transition ${
                     tier.featured
-                      ? "bg-[#BFA044] text-black hover:bg-[#d8ba59]"
-                      : "border border-white/15 bg-white/5 text-white hover:border-[#BFA044]/50 hover:bg-white/10"
+                      ? "bg-accent text-white hover:bg-accent-hover"
+                      : "border border-white/15 bg-white/5 text-white hover:border-accent/50 hover:bg-white/10"
                   } ${isArabic ? "flex-row-reverse" : ""}`}
                 >
                   {copyFor(locale, tier.cta)}
@@ -1202,7 +1202,7 @@ export function SnapMathLanding() {
                     }`}
                   >
                     <span className={`inline-flex items-center gap-2 ${isArabic ? "flex-row-reverse" : ""}`}>
-                      <Check className="h-4 w-4 text-[#F5E7A6]" />
+                      <Check className="h-4 w-4 text-accent-light" />
                       {item}
                     </span>
                   </div>
@@ -1210,7 +1210,7 @@ export function SnapMathLanding() {
               </div>
             </div>
 
-            <div className="rounded-[2rem] border border-[#BFA044]/20 bg-[linear-gradient(180deg,rgba(191,160,68,0.10),rgba(255,255,255,0.03))] p-6 shadow-[0_30px_80px_rgba(0,0,0,0.45)]">
+            <div className="gradient-waitlist rounded-[2rem] border border-accent/20 p-6 shadow-[0_30px_80px_rgba(0,0,0,0.45)]">
               <form className="space-y-4" onSubmit={submitWaitlist}>
                 <div className="grid gap-4 md:grid-cols-2">
                   <label className="block">
@@ -1219,7 +1219,7 @@ export function SnapMathLanding() {
                       required
                       value={waitlistForm.name}
                       onChange={(event) => updateWaitlistField("name", event.target.value)}
-                      className={`w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-base text-white outline-none transition placeholder:text-white/25 focus:border-[#BFA044]/60 focus:bg-black/35 ${textAlign}`}
+                      className={`w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-base text-white outline-none transition placeholder:text-white/25 focus:border-accent/60 focus:bg-black/35 ${textAlign}`}
                       placeholder={waitlistCopy.name}
                     />
                   </label>
@@ -1232,7 +1232,7 @@ export function SnapMathLanding() {
                       value={waitlistForm.email}
                       onChange={(event) => updateWaitlistField("email", event.target.value)}
                       dir="ltr"
-                      className="w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-base text-white outline-none transition placeholder:text-white/25 focus:border-[#BFA044]/60 focus:bg-black/35"
+                      className="w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-base text-white outline-none transition placeholder:text-white/25 focus:border-accent/60 focus:bg-black/35"
                       placeholder="name@example.com"
                     />
                   </label>
@@ -1245,7 +1245,7 @@ export function SnapMathLanding() {
                       value={waitlistForm.phone}
                       onChange={(event) => updateWaitlistField("phone", event.target.value)}
                       dir="ltr"
-                      className="w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-base text-white outline-none transition placeholder:text-white/25 focus:border-[#BFA044]/60 focus:bg-black/35"
+                      className="w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-base text-white outline-none transition placeholder:text-white/25 focus:border-accent/60 focus:bg-black/35"
                       placeholder="+962 7X XXX XXXX"
                     />
                   </label>
@@ -1256,10 +1256,10 @@ export function SnapMathLanding() {
                       required
                       value={waitlistForm.role}
                       onChange={(event) => updateWaitlistField("role", event.target.value)}
-                      className={`w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-base text-white outline-none transition focus:border-[#BFA044]/60 focus:bg-black/35 ${textAlign}`}
+                      className={`w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-base text-white outline-none transition focus:border-accent/60 focus:bg-black/35 ${textAlign}`}
                     >
                       {waitlistCopy.roleOptions.map((option) => (
-                        <option key={option.value} value={option.value} className="bg-[#111111]">
+                        <option key={option.value} value={option.value} className="bg-surface">
                           {option.label}
                         </option>
                       ))}
@@ -1279,7 +1279,7 @@ export function SnapMathLanding() {
                           onClick={() => updateWaitlistField("interest", option.value)}
                           className={`rounded-2xl border px-4 py-3 text-sm transition ${
                             selected
-                              ? "border-[#BFA044]/60 bg-[#BFA044]/12 text-[#F5E7A6]"
+                              ? "border-accent/60 bg-accent/12 text-accent-light"
                               : "border-white/10 bg-black/20 text-white/72 hover:border-white/20 hover:text-white"
                           } ${isArabic ? "text-right" : "text-left"}`}
                         >
@@ -1296,7 +1296,7 @@ export function SnapMathLanding() {
                     value={waitlistForm.notes}
                     onChange={(event) => updateWaitlistField("notes", event.target.value)}
                     rows={4}
-                    className={`w-full rounded-[1.6rem] border border-white/10 bg-black/25 px-4 py-3 text-base text-white outline-none transition placeholder:text-white/25 focus:border-[#BFA044]/60 focus:bg-black/35 ${textAlign}`}
+                    className={`w-full rounded-[1.6rem] border border-white/10 bg-black/25 px-4 py-3 text-base text-white outline-none transition placeholder:text-white/25 focus:border-accent/60 focus:bg-black/35 ${textAlign}`}
                     placeholder={waitlistCopy.notesPlaceholder}
                   />
                 </label>
@@ -1305,7 +1305,7 @@ export function SnapMathLanding() {
                   <button
                     type="submit"
                     disabled={waitlistState === "submitting"}
-                    className={`inline-flex items-center gap-2 rounded-full bg-[#BFA044] px-6 py-3 text-base font-semibold text-black transition hover:bg-[#d8ba59] disabled:cursor-not-allowed disabled:opacity-70 ${
+                    className={`inline-flex items-center gap-2 rounded-full bg-accent px-6 py-3 text-base font-semibold text-white transition hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-70 ${
                       isArabic ? "flex-row-reverse" : ""
                     }`}
                   >
@@ -1315,7 +1315,7 @@ export function SnapMathLanding() {
 
                   <a
                     href="mailto:hello@snapmathacademy.com"
-                    className={`text-sm text-white/58 transition hover:text-[#F5E7A6] ${textAlign}`}
+                    className={`text-sm text-white/58 transition hover:text-accent-light ${textAlign}`}
                   >
                     hello@snapmathacademy.com
                   </a>
@@ -1357,7 +1357,7 @@ export function SnapMathLanding() {
                 <thead>
                   <tr className="bg-black/20 text-white/65">
                     <th className={`px-6 py-4 ${textAlign}`}>{isArabic ? "المعيار" : "Category"}</th>
-                    <th className="bg-[#BFA044]/12 px-6 py-4 text-[#F5E7A6]">SnapMath</th>
+                    <th className="bg-accent/12 px-6 py-4 text-accent-light">SnapMath</th>
                     <th className="px-6 py-4">Jo Academy</th>
                     <th className="px-6 py-4">{isArabic ? "الدروس الخصوصية" : "Private Tutors"}</th>
                   </tr>
@@ -1368,7 +1368,7 @@ export function SnapMathLanding() {
                       <td className={`border-t border-white/10 px-6 py-5 text-white/75 ${textAlign}`}>
                         {copyFor(locale, row.label)}
                       </td>
-                      <td className="border-t border-white/10 bg-[#BFA044]/8 px-6 py-5 font-medium text-[#F5E7A6]">
+                      <td className="border-t border-white/10 bg-accent/10 px-6 py-5 font-medium text-accent-light">
                         {copyFor(locale, row.snapmath)}
                       </td>
                       <td className="border-t border-white/10 px-6 py-5 text-white/65">
@@ -1407,7 +1407,7 @@ export function SnapMathLanding() {
                 className="rounded-[2rem] border border-white/10 bg-white/5 p-6 backdrop-blur-sm"
               >
                 <div
-                  className={`inline-flex items-center gap-2 rounded-full border border-[#BFA044]/30 bg-[#BFA044]/10 px-3 py-1 text-xs uppercase tracking-[0.18em] text-[#F5E7A6] ${
+                  className={`inline-flex items-center gap-2 rounded-full border border-accent/30 bg-accent/10 px-3 py-1 text-xs uppercase tracking-[0.18em] text-accent-light ${
                     isArabic ? "flex-row-reverse" : ""
                   }`}
                 >
@@ -1418,7 +1418,7 @@ export function SnapMathLanding() {
                   <p className={`text-lg font-semibold text-white ${headingClass}`}>
                     {copyFor(locale, card.title)}
                   </p>
-                  <p className="mt-2 text-sm text-[#F5E7A6]/80">{copyFor(locale, card.subtitle)}</p>
+                  <p className="mt-2 text-sm text-accent-light/80">{copyFor(locale, card.subtitle)}</p>
                 </div>
                 <p className={`mt-5 text-base leading-8 text-white/68 ${textAlign}`}>
                   {copyFor(locale, card.body)}
@@ -1435,33 +1435,33 @@ export function SnapMathLanding() {
               href="https://instagram.com/snapmathacademy"
               target="_blank"
               rel="noreferrer"
-              className={`inline-flex items-center gap-2 rounded-full border border-white/12 bg-white/5 px-5 py-3 text-sm text-white/80 transition hover:border-[#BFA044]/50 hover:text-white ${
+              className={`inline-flex items-center gap-2 rounded-full border border-white/12 bg-white/5 px-5 py-3 text-sm text-white/80 transition hover:border-accent/50 hover:text-white ${
                 isArabic ? "flex-row-reverse" : ""
               }`}
             >
-              <Camera className="h-4 w-4 text-[#F5E7A6]" />
+              <Camera className="h-4 w-4 text-accent-light" />
               <span dir="ltr">Instagram · {socialHandle}</span>
             </a>
             <a
               href="https://www.tiktok.com/@snapmathacademy"
               target="_blank"
               rel="noreferrer"
-              className={`inline-flex items-center gap-2 rounded-full border border-white/12 bg-white/5 px-5 py-3 text-sm text-white/80 transition hover:border-[#BFA044]/50 hover:text-white ${
+              className={`inline-flex items-center gap-2 rounded-full border border-white/12 bg-white/5 px-5 py-3 text-sm text-white/80 transition hover:border-accent/50 hover:text-white ${
                 isArabic ? "flex-row-reverse" : ""
               }`}
             >
-              <Music2 className="h-4 w-4 text-[#F5E7A6]" />
+              <Music2 className="h-4 w-4 text-accent-light" />
               <span dir="ltr">TikTok · {socialHandle}</span>
             </a>
             <a
               href="https://youtube.com/@snapmathacademy"
               target="_blank"
               rel="noreferrer"
-              className={`inline-flex items-center gap-2 rounded-full border border-white/12 bg-white/5 px-5 py-3 text-sm text-white/80 transition hover:border-[#BFA044]/50 hover:text-white ${
+              className={`inline-flex items-center gap-2 rounded-full border border-white/12 bg-white/5 px-5 py-3 text-sm text-white/80 transition hover:border-accent/50 hover:text-white ${
                 isArabic ? "flex-row-reverse" : ""
               }`}
             >
-              <Video className="h-4 w-4 text-[#F5E7A6]" />
+              <Video className="h-4 w-4 text-accent-light" />
               <span dir="ltr">YouTube · {socialHandle}</span>
             </a>
           </div>
@@ -1490,13 +1490,13 @@ export function SnapMathLanding() {
             <div
               className={`mt-6 flex flex-wrap gap-4 text-sm text-white/55 ${isArabic ? "justify-end" : ""}`}
             >
-              <a href="/privacy" className="transition hover:text-[#F5E7A6]">
+              <a href="/privacy" className="transition hover:text-accent-light">
                 {isArabic ? "سياسة الخصوصية" : "Privacy Policy"}
               </a>
-              <a href="/terms" className="transition hover:text-[#F5E7A6]">
+              <a href="/terms" className="transition hover:text-accent-light">
                 {isArabic ? "الشروط والأحكام" : "Terms"}
               </a>
-              <a href="mailto:hello@snapmathacademy.com" className="transition hover:text-[#F5E7A6]">
+              <a href="mailto:hello@snapmathacademy.com" className="transition hover:text-accent-light">
                 {isArabic ? "تواصل معنا" : "Contact"}
               </a>
             </div>
@@ -1507,11 +1507,11 @@ export function SnapMathLanding() {
           <div className={`flex flex-col gap-4 ${isArabic ? "items-end" : "items-start"}`}>
             <a
               href={launchInterestHref}
-              className={`inline-flex items-center gap-3 rounded-[1.4rem] border border-white/12 bg-white/5 px-5 py-4 text-sm text-white/78 transition hover:border-[#BFA044]/50 hover:text-white ${
+              className={`inline-flex items-center gap-3 rounded-[1.4rem] border border-white/12 bg-white/5 px-5 py-4 text-sm text-white/78 transition hover:border-accent/50 hover:text-white ${
                 isArabic ? "flex-row-reverse" : ""
               }`}
             >
-              <Download className="h-5 w-5 text-[#F5E7A6]" />
+              <Download className="h-5 w-5 text-accent-light" />
               <span className={textAlign}>
                 <span className="block text-xs uppercase tracking-[0.25em] text-white/45">
                   {isArabic ? "App Store" : "App Store"}

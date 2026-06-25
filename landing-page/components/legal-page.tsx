@@ -24,25 +24,25 @@ export function LegalPage({
   return (
     <main
       dir="rtl"
-      className="relative min-h-screen overflow-x-hidden bg-[#0A0A0A] text-white selection:bg-[#BFA044] selection:text-black"
+      className="relative min-h-screen overflow-x-hidden bg-background text-white selection:bg-accent selection:text-background"
     >
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
         <div className="hero-orb hero-orb-1" />
         <div className="hero-orb hero-orb-2" />
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(191,160,68,0.12),transparent_35%),radial-gradient(circle_at_bottom,rgba(191,160,68,0.1),transparent_28%)]" />
+        <div className="page-glow absolute inset-0" />
         <div className="grain-overlay" />
       </div>
 
       <div className="relative z-10 mx-auto max-w-4xl px-6 py-10 md:py-16">
         <Link
           href="/"
-          className="inline-flex items-center gap-2 rounded-full border border-white/12 bg-white/5 px-4 py-2 text-sm text-white/78 transition hover:border-[#BFA044]/50 hover:text-white"
+          className="inline-flex items-center gap-2 rounded-full border border-white/12 bg-white/5 px-4 py-2 text-sm text-white/78 transition hover:border-accent/50 hover:text-white"
         >
-          <ArrowLeft className="h-4 w-4 text-[#F5E7A6]" />
+          <ArrowLeft className="h-4 w-4 text-accent-light" />
           العودة إلى الصفحة الرئيسية
         </Link>
 
-        <section className="mt-8 rounded-[2rem] border border-white/10 bg-white/5 p-6 shadow-[0_0_120px_rgba(191,160,68,0.08)] md:p-8">
+        <section className="shadow-accent-md mt-8 rounded-[2rem] border border-white/10 bg-white/5 p-6 md:p-8">
           <p className="section-label">{eyebrow}</p>
           <h1 className="mt-4 font-arabic text-3xl font-semibold text-white sm:text-5xl">
             {title}
