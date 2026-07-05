@@ -19,6 +19,7 @@ const RELEASE_DIRECTORIES = [
 const RELEASE_FILES = [
   '.easignore',
   '.gitignore',
+  'app.config.js',
   'app.json',
   'eas.json',
   'expo-env.d.ts',

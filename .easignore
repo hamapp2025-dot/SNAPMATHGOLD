@@ -59,10 +59,8 @@ npm-debug.*
 # Unused founder media variants
 assets/media/founder/founder-intro.mp4
 assets/media/founder/founder-intro-v2.mp4
-assets/media/founder/founder-welcome.mp4
 assets/media/founder/founder-welcome-poster.jpg
 assets/media/founder/founder-welcome-poster-v2.jpg
-assets/media/founder/founder-welcome-poster-v3.jpg
 
 # Unused intermediate lesson media
 assets/media/lessons/u1-l1-hero.mp4
