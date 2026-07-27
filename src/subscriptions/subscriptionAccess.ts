@@ -14,10 +14,12 @@ const TIER_RANK: Record<SubscriptionTier, number> = {
 };
 
 const FEATURE_REQUIREMENTS: Record<SubscriptionFeatureKey, SubscriptionTier> = {
+  // Hybrid model: one Premium unlock opens every feature. Free access to
+  // Unit 1 + the daily practice quota is handled separately (see isUnitFree).
   grade12Path: 'bronze',
-  mathscan: 'silver',
-  aiChat: 'gold',
-  premiumThemes: 'silver',
+  mathscan: 'bronze',
+  aiChat: 'bronze',
+  premiumThemes: 'bronze',
 };
 
 const FEATURE_COPY = {
@@ -133,6 +135,16 @@ export function canAccessFeature(currentTier: SubscriptionTier, feature: Subscri
   return hasTierAccess(currentTier, FEATURE_REQUIREMENTS[feature]);
 }
 
+export const FREE_UNIT_IDS = ['u1'];
+
+export function isUnitFree(unitId: string | null | undefined): boolean {
+  return !!unitId && FREE_UNIT_IDS.includes(unitId);
+}
+
+export function canOpenUnit(currentTier: SubscriptionTier, unitId: string | null | undefined): boolean {
+  return isUnitFree(unitId) || canAccessFeature(currentTier, 'grade12Path');
+}
+
 export function getHigherTier(a: SubscriptionTier, b: SubscriptionTier): SubscriptionTier {
   return TIER_RANK[a] >= TIER_RANK[b] ? a : b;
 }
@@ -140,7 +152,7 @@ export function getHigherTier(a: SubscriptionTier, b: SubscriptionTier): Subscri
 export function getTierLabel(tier: SubscriptionTier, isAr: boolean): string {
   switch (tier) {
     case 'gold':
-      return isAr ? 'الذهبية' : 'Gold';
+      return isAr ? 'المميزة' : 'Premium';
     case 'silver':
       return isAr ? 'الفضية' : 'Silver';
     case 'bronze':

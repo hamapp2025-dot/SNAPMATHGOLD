@@ -272,7 +272,7 @@ export default function SettingsScreen() {
                         },
                       ]}>
                       <Text style={[s.themeTierText, { color: opt.text }]}>
-                        {getTierLabel(opt.tier, isAr)}
+                        {isAr ? 'المميزة' : 'Premium'}
                       </Text>
                     </View>
                   ) : null}

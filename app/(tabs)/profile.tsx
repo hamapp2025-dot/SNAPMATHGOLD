@@ -54,7 +54,7 @@ function getSubscriptionMeta(tier: SubscriptionTier, isAr: boolean, accent: stri
   if (tier === 'gold') {
     return {
       color: preferAccentForGold ? accent : '#FFD700',
-      label: isAr ? 'الخطة الذهبية' : 'Gold Plan',
+      label: isAr ? 'الخطة المميزة' : 'Premium Plan',
     };
   }
 

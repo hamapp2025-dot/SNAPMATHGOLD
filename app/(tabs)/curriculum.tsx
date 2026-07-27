@@ -147,12 +147,8 @@ function UnitCard({
 }
 
 export default function CurriculumScreen() {
-  const { currentTier } = useSubscription();
-
-  if (!canAccessFeature(currentTier, 'grade12Path')) {
-    return <PremiumAccessScreen feature="grade12Path" />;
-  }
-
+  // Free users can browse the full curriculum; premium is enforced when opening
+  // a locked unit's chapter/lesson (Unit 1 is free).
   return <CurriculumContent />;
 }
 

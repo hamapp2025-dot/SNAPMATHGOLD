@@ -16,7 +16,7 @@ import { useBookmarks } from '../src/hooks/useBookmarks';
 import { getMasteryLevelForLessonCompletion, setMasteryLevel } from '../src/hooks/useMastery';
 import { formatMediaDuration, getLessonMediaBlueprint, getLessonMediaStatusLabel, type LessonMediaSegmentKind } from '../src/media/lessonMedia';
 import { useSubscription } from '../src/subscriptions/SubscriptionContext';
-import { canAccessFeature } from '../src/subscriptions/subscriptionAccess';
+import { canOpenUnit } from '../src/subscriptions/subscriptionAccess';
 import { stabilizeMixedMathText } from '../src/utils/bidi';
 import { getLocalizedQuestionOption } from '../src/utils/questionOptions';
 import { withAlpha } from '../src/theme/colorUtils';
@@ -62,8 +62,10 @@ function getMediaStatusIcon(status: 'pilot-ready' | 'scripted' | 'planned') {
 
 export default function LessonPlayerScreen() {
   const { currentTier } = useSubscription();
+  const params = useLocalSearchParams<{ unitId?: string; lessonId?: string }>();
+  const unitId = params.unitId ?? (params.lessonId ? findLessonById(params.lessonId)?.unit.id : undefined);
 
-  if (!canAccessFeature(currentTier, 'grade12Path')) {
+  if (!canOpenUnit(currentTier, unitId)) {
     return <PremiumAccessScreen feature="grade12Path" />;
   }
 

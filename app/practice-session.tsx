@@ -12,7 +12,7 @@ import { useScoreHistory } from '../src/hooks/useScoreHistory';
 import { useXP, XP_CORRECT_ANSWER, XP_PERFECT_QUIZ } from '../src/hooks/useXP';
 import { useT } from '../src/config/LanguageContext';
 import { useSubscription } from '../src/subscriptions/SubscriptionContext';
-import { canAccessFeature } from '../src/subscriptions/subscriptionAccess';
+import { canOpenUnit } from '../src/subscriptions/subscriptionAccess';
 import { useAppTheme } from '../src/theme/ThemeContext';
 import { withAlpha } from '../src/theme/colorUtils';
 import { getThemeSemantics } from '../src/theme/themeSemantics';
@@ -89,8 +89,9 @@ function shuffleSeeded<T>(arr: T[], seed: number): T[] {
 
 export default function PracticeSessionScreen() {
   const { currentTier } = useSubscription();
+  const { unitId } = useLocalSearchParams<{ unitId?: string }>();
 
-  if (!canAccessFeature(currentTier, 'grade12Path')) {
+  if (!canOpenUnit(currentTier, unitId)) {
     return <PremiumAccessScreen feature="grade12Path" />;
   }
 

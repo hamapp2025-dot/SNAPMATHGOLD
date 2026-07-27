@@ -34,6 +34,8 @@ import {
 
 type BillingMode = 'preview' | 'revenuecat' | 'unconfigured';
 
+export type SubscriptionDuration = 'monthly' | 'semester' | 'annual';
+
 type SubscriptionContextValue = {
   currentTier: SubscriptionTier;
   currentPeriodEndsAt: string | null;
@@ -43,8 +45,10 @@ type SubscriptionContextValue = {
   customerInfo: CustomerInfo | null;
   currentOffering: PurchasesOffering | null;
   packagesByTier: Partial<Record<PaidPlanKey, PurchasesPackage>>;
+  packagesByDuration: Partial<Record<SubscriptionDuration, PurchasesPackage>>;
   refresh: () => Promise<void>;
   purchaseTier: (tier: PaidPlanKey) => Promise<'purchased' | 'cancelled' | 'preview' | 'unavailable'>;
+  purchaseDuration: (duration: SubscriptionDuration) => Promise<'purchased' | 'cancelled' | 'preview' | 'unavailable'>;
   restorePurchases: () => Promise<boolean>;
 };
 
@@ -135,6 +139,23 @@ function mapPackagesByTier(offerings: PurchasesOfferings | null): Partial<Record
   }
 
   return packages;
+}
+
+function mapPackagesByDuration(
+  offering: PurchasesOffering | null,
+): Partial<Record<SubscriptionDuration, PurchasesPackage>> {
+  if (!offering) return {};
+  const out: Partial<Record<SubscriptionDuration, PurchasesPackage>> = {};
+  if (offering.monthly) out.monthly = offering.monthly;
+  if (offering.sixMonth) out.semester = offering.sixMonth;
+  if (offering.annual) out.annual = offering.annual;
+  for (const pkg of offering.availablePackages) {
+    const id = `${pkg.identifier} ${pkg.product.identifier}`.toLowerCase();
+    if (!out.monthly && /month/.test(id)) out.monthly = pkg;
+    if (!out.semester && /(semester|six|6.?month|half)/.test(id)) out.semester = pkg;
+    if (!out.annual && /(annual|year)/.test(id)) out.annual = pkg;
+  }
+  return out;
 }
 
 function resolveTierFromCustomerInfo(customerInfo: CustomerInfo | null): SubscriptionTier {
@@ -230,6 +251,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
   const [customerInfo, setCustomerInfo] = useState<CustomerInfo | null>(null);
   const [currentOffering, setCurrentOffering] = useState<PurchasesOffering | null>(null);
   const [packagesByTier, setPackagesByTier] = useState<Partial<Record<PaidPlanKey, PurchasesPackage>>>({});
+  const packagesByDuration = useMemo(() => mapPackagesByDuration(currentOffering), [currentOffering]);
   const configuredRef = useRef(false);
   const hasRevenueCatConfig = Platform.OS === 'ios' && IOS_API_KEY.length > 0;
 
@@ -389,6 +411,37 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
     [applyCustomerInfo, hasRevenueCatConfig, packagesByTier],
   );
 
+  const purchaseDuration = useCallback(
+    async (duration: SubscriptionDuration) => {
+      if (!hasRevenueCatConfig) {
+        const previewTier = getHigherTier('gold', PREVIEW_FALLBACK_TIER);
+        await AsyncStorage.multiSet([
+          [PLAN_PREVIEW_STORAGE, previewTier],
+          [SUBSCRIPTION_TIER_STORAGE, previewTier],
+        ]);
+        setCurrentTier(previewTier);
+        return 'preview' as const;
+      }
+
+      const selectedPackage = packagesByDuration[duration];
+      if (!selectedPackage) {
+        return 'unavailable' as const;
+      }
+
+      try {
+        const result = await Purchases.purchasePackage(selectedPackage);
+        await applyCustomerInfo(result.customerInfo);
+        return 'purchased' as const;
+      } catch (error: any) {
+        if (error?.userCancelled) {
+          return 'cancelled' as const;
+        }
+        throw error;
+      }
+    },
+    [applyCustomerInfo, hasRevenueCatConfig, packagesByDuration],
+  );
+
   const restorePurchases = useCallback(async () => {
     if (!hasRevenueCatConfig) {
       return false;
@@ -415,8 +468,10 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
       customerInfo,
       currentOffering,
       packagesByTier,
+      packagesByDuration,
       refresh,
       purchaseTier,
+      purchaseDuration,
       restorePurchases,
     };
   }, [
@@ -427,7 +482,9 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
     hasRevenueCatConfig,
     isLoading,
     packagesByTier,
+    packagesByDuration,
     purchaseTier,
+    purchaseDuration,
     refresh,
     restorePurchases,
   ]);

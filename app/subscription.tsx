@@ -25,11 +25,26 @@ const GOLD_DIM = premiumGoldTint(0.18);
 const WHITE = '#FFFFFF';
 const MUTED = '#B8BED6';
 
+const PREMIUM_FEATURES_AR = [
+  { text: 'الوصول إلى جميع دروس الصف 12', included: true },
+  { text: 'مجموعات تدريب لا محدودة', included: true },
+  { text: 'MathScan — إرشاد خطوة بخطوة للمسائل', included: true },
+  { text: 'ثيمات مميزة وملف شخصي فاخر', included: true },
+  { text: 'محادثة AI غير محدودة', included: true },
+];
+const PREMIUM_FEATURES_EN = [
+  { text: 'Access to all Grade 12 lessons', included: true },
+  { text: 'Unlimited practice sets', included: true },
+  { text: 'MathScan — step-by-step problem help', included: true },
+  { text: 'Premium themes & profile styles', included: true },
+  { text: 'Unlimited AI Chat tutor', included: true },
+];
+
 const TERMS_URL = 'https://snapmathacademy.com/terms';
 const PRIVACY_URL = 'https://snapmathacademy.com/privacy';
 
 type Plan = {
-  key: 'bronze' | 'silver' | 'gold';
+  key: 'monthly' | 'semester' | 'annual';
   title: string;
   subtitle: string;
   features: { text: string; included: boolean }[];
@@ -44,7 +59,7 @@ type Plan = {
   ink: string;
 };
 
-const PLAN_KEYS = ['bronze', 'silver', 'gold'] as const;
+const PLAN_KEYS = ['monthly', 'semester', 'annual'] as const;
 
 function isPlanKey(value: string | null): value is Plan['key'] {
   return !!value && PLAN_KEYS.includes(value as Plan['key']);
@@ -55,9 +70,9 @@ function isFeatureKey(value: string | string[] | undefined): value is Subscripti
 }
 
 function getPlanLabel(planKey: Plan['key'], isAr: boolean) {
-  if (planKey === 'gold') return isAr ? 'الذهبية' : 'Gold';
-  if (planKey === 'silver') return isAr ? 'الفضية' : 'Silver';
-  return isAr ? 'البرونزية' : 'Bronze';
+  if (planKey === 'annual') return isAr ? 'السنوية' : 'Annual';
+  if (planKey === 'semester') return isAr ? 'الفصلية' : 'Semester';
+  return isAr ? 'الشهرية' : 'Monthly';
 }
 
 function PlanCard({
@@ -206,12 +221,12 @@ export default function SubscriptionScreen() {
     currentOffering,
     hasRevenueCatConfig,
     isLoading: subscriptionLoading,
-    packagesByTier,
-    purchaseTier,
+    packagesByDuration,
+    purchaseDuration,
     refresh,
     restorePurchases,
   } = useSubscription();
-  const [selectedKey, setSelectedKey] = useState<Plan['key']>('silver');
+  const [selectedKey, setSelectedKey] = useState<Plan['key']>('annual');
   const [loading, setLoading] = useState(false);
   const recommendedTierParam = typeof params.recommendedTier === 'string' ? params.recommendedTier : null;
   const focusFeature = isFeatureKey(params.focusFeature) ? params.focusFeature : null;
@@ -236,151 +251,67 @@ export default function SubscriptionScreen() {
     }
   }, [currentTier, recommendedTierParam]);
 
-  const plans: Plan[] = isAr
-    ? [
-        {
-          key: 'bronze',
-          title: 'برونزي',
-          subtitle: 'بداية قوية بأساسيات الصف 12',
-          trialDays: 7,
-          features: [
-            { text: 'الوصول إلى جميع دروس الصف 12', included: true },
-            { text: 'مجموعات تدريب لا محدودة', included: true },
-            { text: 'MathScan — إرشاد خطوة بخطوة للمسائل', included: false },
-            { text: 'ثيمات مميزة وملف شخصي فاخر', included: false },
-            { text: 'محادثة AI غير محدودة', included: false },
-          ],
-          badge: 'بداية ممتازة',
-          price: '$9.99 / شهر',
-          priceNote: '$119.88 سنوياً',
-          accent: '#CD7F32',
-          gradient: ['#E8A85A', '#A0522D'],
-          tint: 'rgba(205,127,50,0.14)',
-          icon: 'medal-outline',
-          ink: WHITE,
-        },
-        {
-          key: 'silver',
-          title: 'فضي',
-          subtitle: 'أدوات أذكى وتدريب أقوى كل يوم',
-          trialDays: 7,
-          features: [
-            { text: 'الوصول إلى جميع دروس الصف 12', included: true },
-            { text: 'مجموعات تدريب لا محدودة', included: true },
-            { text: 'MathScan — إرشاد خطوة بخطوة للمسائل', included: true },
-            { text: 'ثيمات مميزة وملف شخصي فاخر', included: true },
-            { text: 'محادثة AI غير محدودة', included: false },
-          ],
-          badge: 'الأفضل قيمة',
-          price: '$12.99 / شهر',
-          priceNote: '$155.88 سنوياً',
-          accent: '#C0C0D8',
-          gradient: ['#E0E0F0', '#A0A0C0'],
-          tint: 'rgba(192,192,216,0.16)',
-          icon: 'sparkles-outline',
-          ink: '#1B1D30',
-        },
-        {
-          key: 'gold',
-          title: 'ذهبي',
-          subtitle: 'تجربة كاملة بدون حدود',
-          trialDays: 7,
-          features: [
-            { text: 'الوصول إلى جميع دروس الصف 12', included: true },
-            { text: 'مجموعات تدريب لا محدودة', included: true },
-            { text: 'MathScan — إرشاد خطوة بخطوة للمسائل', included: true },
-            { text: 'ثيمات مميزة وملف شخصي فاخر', included: true },
-            { text: 'محادثة AI غير محدودة', included: true },
-          ],
-          badge: 'كامل المزايا',
-          price: '$14.99 / شهر',
-          priceNote: '$179.88 سنوياً',
-          accent: GOLD,
-          gradient: PREMIUM_GOLD_GRADIENT,
-          tint: premiumGoldTint(0.16),
-          icon: 'trophy-outline',
-          ink: PREMIUM_GOLD_INK,
-        },
-      ]
-    : [
-        {
-          key: 'bronze',
-          title: 'Bronze',
-          subtitle: 'A strong start for core Grade 12 study',
-          trialDays: 7,
-          features: [
-            { text: 'All Grade 12 lessons & videos', included: true },
-            { text: 'Unlimited practice sets', included: true },
-            { text: 'MathScan — step-by-step problem help', included: false },
-            { text: 'Premium themes & profile styles', included: false },
-            { text: 'Unlimited AI Chat tutor', included: false },
-          ],
-          badge: 'SMART START',
-          price: '$9.99 / month',
-          priceNote: 'billed $119.88 annually',
-          accent: '#CD7F32',
-          gradient: ['#E8A85A', '#A0522D'],
-          tint: 'rgba(205,127,50,0.14)',
-          icon: 'medal-outline',
-          ink: WHITE,
-        },
-        {
-          key: 'silver',
-          title: 'Silver',
-          subtitle: 'Adds smarter tools and premium styling',
-          trialDays: 7,
-          features: [
-            { text: 'All Grade 12 lessons & videos', included: true },
-            { text: 'Unlimited practice sets', included: true },
-            { text: 'MathScan — step-by-step problem help', included: true },
-            { text: 'Premium themes & profile styles', included: true },
-            { text: 'Unlimited AI Chat tutor', included: false },
-          ],
-          badge: 'BEST VALUE',
-          price: '$12.99 / month',
-          priceNote: 'billed $155.88 annually',
-          accent: '#C0C0D8',
-          gradient: ['#E0E0F0', '#A0A0C0'],
-          tint: 'rgba(192,192,216,0.16)',
-          icon: 'sparkles-outline',
-          ink: '#1B1D30',
-        },
-        {
-          key: 'gold',
-          title: 'Gold',
-          subtitle: 'Full access, no limits',
-          trialDays: 7,
-          features: [
-            { text: 'All Grade 12 lessons & videos', included: true },
-            { text: 'Unlimited practice sets', included: true },
-            { text: 'MathScan — step-by-step problem help', included: true },
-            { text: 'Premium themes & profile styles', included: true },
-            { text: 'Unlimited AI Chat tutor', included: true },
-          ],
-          badge: 'FULL ACCESS',
-          price: '$14.99 / month',
-          priceNote: 'billed $179.88 annually',
-          accent: GOLD,
-          gradient: PREMIUM_GOLD_GRADIENT,
-          tint: premiumGoldTint(0.16),
-          icon: 'trophy-outline',
-          ink: PREMIUM_GOLD_INK,
-        },
-      ];
+  const premiumFeatures = isAr ? PREMIUM_FEATURES_AR : PREMIUM_FEATURES_EN;
+  const plans: Plan[] = [
+    {
+      key: 'monthly',
+      title: isAr ? 'شهري' : 'Monthly',
+      subtitle: isAr ? 'وصول كامل بفوترة شهرية' : 'Full access, billed monthly',
+      trialDays: 7,
+      features: premiumFeatures,
+      badge: isAr ? 'مرن' : 'FLEXIBLE',
+      price: '—',
+      priceNote: isAr ? 'يتجدد شهرياً' : 'Renews monthly',
+      accent: '#C0C0D8',
+      gradient: ['#E0E0F0', '#A0A0C0'],
+      tint: 'rgba(192,192,216,0.16)',
+      icon: 'calendar-outline',
+      ink: '#1B1D30',
+    },
+    {
+      key: 'semester',
+      title: isAr ? 'فصلي' : 'Semester',
+      subtitle: isAr ? 'يغطي فصلاً دراسياً كاملاً' : 'Covers a full semester',
+      trialDays: 7,
+      features: premiumFeatures,
+      badge: isAr ? 'الأنسب للتوجيهي' : 'BEST FOR TAWJIHI',
+      price: '—',
+      priceNote: isAr ? 'يتجدد كل 6 أشهر' : 'Renews every 6 months',
+      accent: GOLD,
+      gradient: PREMIUM_GOLD_GRADIENT,
+      tint: premiumGoldTint(0.16),
+      icon: 'school-outline',
+      ink: PREMIUM_GOLD_INK,
+    },
+    {
+      key: 'annual',
+      title: isAr ? 'سنوي' : 'Annual',
+      subtitle: isAr ? 'أفضل قيمة على مدار السنة' : 'Best value across the year',
+      trialDays: 7,
+      features: premiumFeatures,
+      badge: isAr ? 'أفضل قيمة' : 'BEST VALUE',
+      price: '—',
+      priceNote: isAr ? 'يتجدد سنوياً' : 'Renews yearly',
+      accent: GOLD,
+      gradient: PREMIUM_GOLD_GRADIENT,
+      tint: premiumGoldTint(0.16),
+      icon: 'trophy-outline',
+      ink: PREMIUM_GOLD_INK,
+    },
+  ];
 
   const plansWithPricing = plans.map((plan) => {
-    const pkg = packagesByTier[plan.key];
+    const pkg = packagesByDuration[plan.key];
     if (!pkg) return plan;
 
     return {
       ...plan,
       price: pkg.product.priceString || plan.price,
-      priceNote: pkg.product.title || plan.priceNote,
     };
   });
 
   const selectedPlan = plansWithPricing.find((p) => p.key === selectedKey) ?? plansWithPricing[0];
-  const selectedPackage = packagesByTier[selectedKey];
+  const selectedPackage = packagesByDuration[selectedKey];
   const currentPlanLabel = getSubscriptionTierLabel(currentTier, isAr);
   const isPreviewAccessIncluded = billingMode === 'preview' && currentTier !== 'free';
   const focusFeatureLabel = focusFeature ? getFeatureShortLabel(focusFeature, isAr) : null;
@@ -395,8 +326,8 @@ export default function SubscriptionScreen() {
     : null;
   const currentPlanSummary = currentTier === 'free'
     ? (isAr
-        ? 'أنت الآن على الخطة المجانية. ابدأ بالبرونزية لفتح المسار الدراسي، أو اختر Silver و Gold للأدوات الذكية.'
-        : 'You are currently on the Free plan. Start with Bronze for the learning path, or move to Silver and Gold for the smart tools.')
+        ? 'أنت الآن على الخطة المجانية. الوحدة 1 مجانية — اشترك في الخطة المميزة لفتح جميع الوحدات وMathScan والمدرب الذكي.'
+        : 'You are on the Free plan. Unit 1 is free — subscribe to Premium to unlock all units, MathScan, and the AI Coach.')
     : isPreviewAccessIncluded
       ? (isAr
           ? `هذه النسخة التجريبية تمنحك حالياً وصول ${currentPlanLabel} حتى يكتمل ربط الشراء عبر App Store.`
@@ -404,11 +335,12 @@ export default function SubscriptionScreen() {
     : (isAr
         ? `أنت الآن على الخطة ${currentPlanLabel}${renewalLabel ? ` · يتجدد ${renewalLabel}` : ''}.`
         : `You are currently on ${currentPlanLabel}${renewalLabel ? ` · renews ${renewalLabel}` : ''}.`);
-  const selectedPlanSummary = currentTier === selectedKey
-    ? (isAr ? `هذه هي خطتك الحالية.` : `This is your current plan.`)
-    : (isAr ? `هذه الخطة تفتح ${selectedPlan.title} وتضع ${focusFeatureLabel ?? 'الأدوات الذكية'} في المقدمة.` : `This plan unlocks ${selectedPlan.title} and brings ${focusFeatureLabel ?? 'the smart tools'} to the front.`);
-  const isCurrentSelectionActive = currentTier !== 'free' && currentTier === selectedKey;
-  const mappedPlanKeys = PLAN_KEYS.filter((key): key is Plan['key'] => !!packagesByTier[key]);
+  const isPremiumActive = currentTier !== 'free';
+  const selectedPlanSummary = isPremiumActive
+    ? (isAr ? 'اشتراكك المميز نشط.' : 'Your Premium subscription is active.')
+    : (isAr ? 'اختر مدة الاشتراك التي تناسبك لفتح الوصول الكامل.' : 'Choose the plan length that suits you to unlock full access.');
+  const isCurrentSelectionActive = isPremiumActive;
+  const mappedPlanKeys = PLAN_KEYS.filter((key): key is Plan['key'] => !!packagesByDuration[key]);
   const mappedPlanLabel = mappedPlanKeys.length
     ? mappedPlanKeys.map((key) => getPlanLabel(key, isAr)).join(isAr ? '، ' : ', ')
     : (isAr ? 'لا توجد خطط مربوطة بعد' : 'No plans mapped yet');
@@ -502,7 +434,7 @@ export default function SubscriptionScreen() {
 
     setLoading(true);
     try {
-      const result = await purchaseTier(selectedKey);
+      const result = await purchaseDuration(selectedKey);
 
       if (result === 'preview') {
         Alert.alert(

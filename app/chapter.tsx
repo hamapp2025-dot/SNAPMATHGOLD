@@ -11,7 +11,7 @@ import { findUnitById } from '../src/data/grade12';
 import { useScoreHistory } from '../src/hooks/useScoreHistory';
 import { MASTERY_FILL, MASTERY_LABELS, MasteryLevel, useMasteryMap } from '../src/hooks/useMastery';
 import { useSubscription } from '../src/subscriptions/SubscriptionContext';
-import { canAccessFeature } from '../src/subscriptions/subscriptionAccess';
+import { canOpenUnit } from '../src/subscriptions/subscriptionAccess';
 import { useAppTheme } from '../src/theme/ThemeContext';
 import { useT } from '../src/config/LanguageContext';
 import { withAlpha } from '../src/theme/colorUtils';
@@ -110,8 +110,9 @@ function LessonMedal({
 
 export default function ChapterScreen() {
   const { currentTier } = useSubscription();
+  const { unitId } = useLocalSearchParams<{ unitId?: string }>();
 
-  if (!canAccessFeature(currentTier, 'grade12Path')) {
+  if (!canOpenUnit(currentTier, unitId)) {
     return <PremiumAccessScreen feature="grade12Path" />;
   }
 
