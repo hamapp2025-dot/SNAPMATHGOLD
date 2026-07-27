@@ -237,7 +237,14 @@ export default function IntroScreen() {
   }, [progressAnim]);
 
   const onVideoStatusUpdate = useCallback((status: AVPlaybackStatus) => {
-    if (!status.isLoaded) return;
+    if (!status.isLoaded) {
+      const loadError = (status as { error?: string }).error;
+      if (loadError) {
+        videoFinishedRef.current = true;
+        if (minReachedRef.current) advance();
+      }
+      return;
+    }
     if (status.durationMillis && status.positionMillis != null) {
       progressAnim.setValue(Math.min(status.positionMillis / status.durationMillis, 1));
     }
@@ -343,6 +350,10 @@ export default function IntroScreen() {
           progressUpdateIntervalMillis={250}
           onLoad={onVideoLoad}
           onPlaybackStatusUpdate={onVideoStatusUpdate}
+          onError={() => {
+            videoFinishedRef.current = true;
+            if (minReachedRef.current) advance();
+          }}
         />
       ) : (
         <>

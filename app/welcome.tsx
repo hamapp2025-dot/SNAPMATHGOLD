@@ -352,7 +352,11 @@ export default function WelcomeScreen() {
   }, [showWelcomeVideo]);
 
   const markWelcomeSeen = async () => {
-    await AsyncStorage.setItem(KEY, '1');
+    try {
+      await AsyncStorage.setItem(KEY, '1');
+    } catch {
+      // Best-effort; continue navigation even if persistence fails.
+    }
   };
 
   const continueToNextRoute = async () => {

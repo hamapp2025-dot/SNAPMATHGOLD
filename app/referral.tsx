@@ -73,13 +73,13 @@ export default function ReferralScreen() {
   const router = useRouter();
   const { theme } = useAppTheme();
   const { t, isAr } = useT() as any;
-  const { addXP } = useXP();
   const [copied, setCopied] = useState(false);
   const [referrals, setReferrals] = useState(0);
 
   useEffect(() => {
     AsyncStorage.getItem(KEY_REFERRALS).then((v) => {
-      if (v) setReferrals(parseInt(v, 10));
+      const n = v ? parseInt(v, 10) : 0;
+      if (Number.isFinite(n)) setReferrals(n);
     });
   }, []);
 
@@ -106,23 +106,6 @@ export default function ReferralScreen() {
     } catch (_) {}
   }
 
-  async function handleSimulateReferral() {
-    // Demo: press to add a referral and award XP for reaching milestones
-    const newCount = referrals + 1;
-    setReferrals(newCount);
-    await AsyncStorage.setItem(KEY_REFERRALS, String(newCount));
-
-    // Check if a milestone was just reached
-    const milestone = MILESTONES.find(([count]) => count === newCount);
-    if (milestone) {
-      const [, bonus, labelEn, labelAr] = milestone;
-      await addXP(bonus);
-      Alert.alert(
-        t('referralMilestoneTitle'),
-        t('referralMilestoneBody', { label: isAr ? labelAr : labelEn, bonus })
-      );
-    }
-  }
 
   return (
     <View style={[s.container, { backgroundColor: theme.bg }]}>
@@ -224,18 +207,6 @@ export default function ReferralScreen() {
             />
           ))}
         </View>
-
-        {/* Demo: simulate a referral */}
-        <TouchableOpacity
-          style={[s.demoBtn, { borderColor: withAlpha(theme.accent, 0.27) }]}
-          onPress={handleSimulateReferral}
-          activeOpacity={0.8}
-        >
-          <Ionicons name="person-add-outline" size={16} color={theme.muted} />
-          <Text style={[s.demoBtnText, { color: theme.muted }]}>
-            {t('referralDemo')}
-          </Text>
-        </TouchableOpacity>
 
         {/* How it works */}
         <Text style={[s.sectionTitle, { color: theme.text }, isAr && { textAlign: 'right' }]}>

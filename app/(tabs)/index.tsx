@@ -20,6 +20,8 @@ const CALENDAR_LOCALE_EN = 'en-US';
 const CALENDAR_LOCALE_AR = 'ar-JO';
 const WEEKDAY_LABELS_EN = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const WEEKDAY_LABELS_AR = ['أح', 'إث', 'ثل', 'أر', 'خم', 'جم', 'سب'];
+const WEEKDAYS_FULL_AR = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
+const MONTHS_AR = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
 const ENGLISH_DAY_FONT = Platform.select({
   ios: 'AvenirNext-Medium',
   android: 'sans-serif-medium',
@@ -188,6 +190,10 @@ export default function ForYouScreen() {
   const heroCtaBg = isLightTheme ? withAlpha(WHITE, 0.96) : heroInk;
   const heroCtaInk = isLightTheme ? theme.primary[1] : WHITE;
   const calendarLocale = isAr ? CALENDAR_LOCALE_AR : CALENDAR_LOCALE_EN;
+  const nowForHeader = new Date();
+  const headerDateText = isAr
+    ? `${WEEKDAYS_FULL_AR[nowForHeader.getDay()]}، ${nowForHeader.getDate()} ${MONTHS_AR[nowForHeader.getMonth()]}`
+    : nowForHeader.toLocaleDateString(calendarLocale, { weekday: 'long', month: 'short', day: 'numeric' });
   const lightTintOpacity = scrollY.interpolate({
     inputRange: [0, 140],
     outputRange: [1, 0.16],
@@ -244,11 +250,7 @@ export default function ForYouScreen() {
           <View style={[s.headerTopRow, isAr && s.rowReverse]}>
             <View style={[s.headerTextWrap, isAr && s.headerTextWrapRtl]}>
               <Text style={[s.headerDate, { color: theme.muted }, isAr && s.textRtl, isAr && s.headerDateAr]}>
-                {new Date().toLocaleDateString(calendarLocale, {
-                  weekday: 'long',
-                  month: 'short',
-                  day: 'numeric',
-                })}
+                {headerDateText}
               </Text>
               <Text style={[s.headerGreeting, { color: theme.text }, isAr && s.textRtl]}>{greetingTitle}</Text>
               <Text style={[s.headerSupport, { color: theme.muted }, isAr && s.textRtl]}>{headerSupport}</Text>

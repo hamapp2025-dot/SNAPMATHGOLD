@@ -307,7 +307,7 @@ function CurriculumContent() {
               <View style={[s.demoRouteBadge, { backgroundColor: withAlpha(theme.accent, 0.14), borderColor: withAlpha(theme.accent, 0.24) }, isAr && s.demoRouteBadgeRtl]}>
                 <Ionicons name="sparkles-outline" size={14} color={theme.accent} />
                 <Text style={[s.demoRouteBadgeText, { color: theme.accent }]}>
-                  {isAr ? 'أفضل مسار للعرض' : 'Best Demo Route'}
+                  {isAr ? 'المسار الموصى به' : 'Recommended Path'}
                 </Text>
               </View>
               <Text style={[s.demoRouteProgress, { color: theme.muted }]}>
@@ -345,7 +345,7 @@ function CurriculumContent() {
                 }
                 style={[s.demoRouteSecondary, { borderColor: theme.border, backgroundColor: withAlpha(theme.bg, 0.28) }]}>
                 <Text style={[s.demoRouteSecondaryText, { color: theme.text }]}>
-                  {isAr ? 'ابدأ الدرس التجريبي' : 'Start Pilot Lesson'}
+                  {isAr ? 'ابدأ الدرس الأول' : 'Start First Lesson'}
                 </Text>
               </TouchableOpacity>
             </View>

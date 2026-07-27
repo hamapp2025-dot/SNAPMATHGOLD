@@ -452,18 +452,26 @@ export default function OnboardingScreen() {
       ]).start();
       setStep((s) => s + 1);
     } else {
-      // Save onboarding data and enter the main app.
+      await completeOnboarding();
+    }
+  };
+
+  const completeOnboarding = async () => {
+    const resolvedName = name.trim() || (isAr ? 'ضيف' : 'Guest');
+    try {
       await AsyncStorage.multiSet([
         [ONBOARDING_KEY, '1'],
         ['@snapmath_seen_welcome', '1'],
         ['@snapmath_grade', grade ?? 'g12'],
-        ['@snapmath_name', name.trim()],
+        ['@snapmath_name', resolvedName],
         ['@snapmath_avatar_color', avatarColor],
         ['@snapmath_goal', goal ?? '20'],
         ['@snapmath_start_unit', startUnit ?? 'u1'],
       ]);
-      router.replace('/(tabs)');
+    } catch {
+      // Persistence is best-effort; still enter the app.
     }
+    router.replace('/(tabs)');
   };
 
   const goBack = () => {
@@ -507,7 +515,7 @@ export default function OnboardingScreen() {
             {step} / {TOTAL_STEPS} · {stepLabels[step - 1] ?? ''}
           </Text>
           <TouchableOpacity
-            onPress={() => router.replace({ pathname: '/auth', params: { next: '/onboarding' } })}
+            onPress={() => completeOnboarding()}
             activeOpacity={0.7}
             style={[s.skipBtn, { backgroundColor: ui.panelRaised, borderColor: theme.border }]}>
             <Text style={[s.skipText, { color: theme.muted }]}>{t('skip')}</Text>

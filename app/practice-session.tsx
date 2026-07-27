@@ -332,15 +332,15 @@ function PracticeSessionContent() {
             <View style={[styles.nextRouteBadge, { backgroundColor: withAlpha(theme.accent, 0.14), borderColor: withAlpha(theme.accent, 0.24) }]}>
               <Ionicons name="trail-sign-outline" size={14} color={theme.accent} />
               <Text style={[styles.nextRouteBadgeText, { color: theme.accent }]}>
-                {isAr ? 'الخطوة التالية' : 'Next Demo Step'}
+                {isAr ? 'الخطوة التالية' : 'Next Step'}
               </Text>
             </View>
             <Text style={[styles.nextRouteMeta, { color: theme.muted }]}>
-              {isAr ? 'تدريب -> اختبار' : 'Practice -> Drill'}
+              {isAr ? 'تدريب ← اختبار' : 'Practice → Drill'}
             </Text>
           </View>
           <Text style={[styles.nextRouteTitle, { color: theme.text }, isAr && styles.textRtl]}>
-            {isAr ? 'حوّل هذه الجولة إلى اختبار قصير لترى التقدم على شاشة نتائج كاملة.' : 'Turn this run into a short drill so the demo lands on a full results screen.'}
+            {isAr ? 'حوّل هذه الجولة إلى اختبار قصير لترى تقدمك على شاشة نتائج كاملة.' : 'Turn this run into a short drill to see your progress on a full results screen.'}
           </Text>
           <TouchableOpacity
             activeOpacity={0.9}

@@ -538,8 +538,8 @@ export default function AuthScreen() {
       Alert.alert(
         isAr ? 'Google غير مهيأ بعد' : 'Google not configured yet',
         isAr
-          ? 'أعدت زر Google بالشكل القديم، لكننا ما زلنا بحاجة إلى Google iOS/Web client IDs لتفعيل تسجيل الدخول.'
-          : 'I restored the Google icon, but we still need the Google iOS/Web client IDs before sign in can work.',
+          ? 'سيتوفر تسجيل الدخول عبر Google قريباً. يمكنك المتابعة بالبريد الإلكتروني الآن.'
+          : 'Google sign-in is coming soon. You can continue with email for now.',
       );
       return;
     }
@@ -547,8 +547,8 @@ export default function AuthScreen() {
     Alert.alert(
       isAr ? 'Facebook قريباً' : 'Facebook coming soon',
       isAr
-        ? 'أعدت أيقونة Facebook بالشكل القديم، وسأربط تسجيل الدخول الحقيقي بعد إضافة Facebook SDK وربطه مع Firebase.'
-        : 'I restored the Facebook icon, and I can wire real sign in after adding the Facebook SDK and Firebase auth setup.',
+        ? 'سيتوفر تسجيل الدخول عبر Facebook قريباً. يمكنك المتابعة بالبريد الإلكتروني الآن.'
+        : 'Facebook sign-in is coming soon. You can continue with email for now.',
     );
   };
 
@@ -647,32 +647,36 @@ export default function AuthScreen() {
   };
 
   const enterAsGuest = async () => {
-    const [savedName, onboardingDone] = await Promise.all([
-      AsyncStorage.getItem('@snapmath_name'),
-      AsyncStorage.getItem('@snapmath_onboarding_done'),
-    ]);
+    try {
+      const [savedName, onboardingDone] = await Promise.all([
+        AsyncStorage.getItem('@snapmath_name'),
+        AsyncStorage.getItem('@snapmath_onboarding_done'),
+      ]);
 
-    if (savedName && onboardingDone) {
-      router.replace('/(tabs)');
-      return;
-    }
+      if (savedName && onboardingDone) {
+        router.replace('/(tabs)');
+        return;
+      }
 
-    if (savedName) {
+      if (savedName) {
+        router.replace('/onboarding');
+        return;
+      }
+
+      if (auth.currentUser) {
+        await signOut(auth);
+        await clearUserSessionStorage();
+      }
+
+      await AsyncStorage.multiSet([
+        [WELCOME_KEY, '1'],
+        ['@snapmath_name', isAr ? 'ضيف' : 'Guest'],
+        ['@snapmath_grade', 'g12'],
+      ]);
       router.replace('/onboarding');
-      return;
+    } catch {
+      router.replace('/onboarding');
     }
-
-    if (auth.currentUser) {
-      await signOut(auth);
-      await clearUserSessionStorage();
-    }
-
-    await AsyncStorage.multiSet([
-      [WELCOME_KEY, '1'],
-      ['@snapmath_name', isAr ? 'ضيف' : 'Guest'],
-      ['@snapmath_grade', 'g12'],
-    ]);
-    router.replace('/onboarding');
   };
 
   return (

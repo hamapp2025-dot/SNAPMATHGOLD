@@ -525,7 +525,7 @@ export default function ProfileScreen() {
             <View style={s.xpTrack}>
               <View style={[s.xpFill, { width: `${Math.round(xpProgress * 100)}%` }]} />
             </View>
-            <Text style={[s.xpNextLabel, { color: withAlpha(theme.primaryInk, 0.7) }]}>{isAr ? `${(100 - Math.round(xpProgress * 100))} نقطة للمستوى التالي` : `${(100 - Math.round(xpProgress * 100))}% to next level`}</Text>
+            <Text style={[s.xpNextLabel, { color: withAlpha(theme.primaryInk, 0.7) }]}>{isAr ? `${(100 - Math.round(xpProgress * 100))}٪ للمستوى التالي` : `${(100 - Math.round(xpProgress * 100))}% to next level`}</Text>
           </View>
         </View>
       </LinearGradient>
