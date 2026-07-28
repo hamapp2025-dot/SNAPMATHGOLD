@@ -1,3 +1,5 @@
+import { EXTRA_PRACTICE } from './practiceBank.generated';
+
 export type Grade12Unit = {
   id: string;
   titleEn: string;
@@ -625,7 +627,19 @@ function validateGrade12Data(units: Grade12Unit[]) {
   }
 }
 
+function mergeExtraPractice(units: Grade12Unit[]) {
+  for (const unit of units) {
+    for (const lesson of unit.lessons) {
+      const extra = EXTRA_PRACTICE[lesson.id];
+      if (extra && extra.length) {
+        lesson.practiceQ = [...lesson.practiceQ, ...extra];
+      }
+    }
+  }
+}
+
 export const ALL_UNITS: Grade12Unit[] = [...SEMESTER_1_UNITS, ...SEMESTER_2_UNITS];
+mergeExtraPractice(ALL_UNITS);
 validateGrade12Data(ALL_UNITS);
 
 export function getLocalizedFormulaLabel(label: string, isAr: boolean, fallbackIndex?: number): string {
