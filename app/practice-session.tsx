@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, Animated, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -13,6 +13,13 @@ import { useXP, XP_CORRECT_ANSWER, XP_PERFECT_QUIZ } from '../src/hooks/useXP';
 import { useT } from '../src/config/LanguageContext';
 import { useSubscription } from '../src/subscriptions/SubscriptionContext';
 import { canOpenUnit } from '../src/subscriptions/subscriptionAccess';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { auth } from '../firebaseConfig';
+import {
+  FREE_DAILY_QUESTION_LIMIT,
+  getDailyQuestionCount,
+  incrementDailyQuestionCount,
+} from '../src/utils/dailyQuestionLimit';
 import { useAppTheme } from '../src/theme/ThemeContext';
 import { withAlpha } from '../src/theme/colorUtils';
 import { getThemeSemantics } from '../src/theme/themeSemantics';
@@ -87,18 +94,80 @@ function shuffleSeeded<T>(arr: T[], seed: number): T[] {
   return copy;
 }
 
+function useFreeDailyQuestionQuota(enabled: boolean) {
+  const [ready, setReady] = useState(!enabled);
+  const [remaining, setRemaining] = useState(0);
+  const uidRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!enabled) {
+      setReady(true);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const storedUid = await AsyncStorage.getItem('@snapmath_uid').catch(() => null);
+      const uid = auth.currentUser?.uid ?? storedUid ?? 'guest';
+      uidRef.current = uid;
+      const count = await getDailyQuestionCount(uid);
+      if (!cancelled) {
+        setRemaining(Math.max(FREE_DAILY_QUESTION_LIMIT - count, 0));
+        setReady(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [enabled]);
+
+  const consume = useCallback((n: number) => {
+    const uid = uidRef.current;
+    if (!uid || n <= 0) return;
+    (async () => {
+      for (let i = 0; i < n; i += 1) {
+        await incrementDailyQuestionCount(uid);
+      }
+    })();
+  }, []);
+
+  return { ready, remaining, consume };
+}
+
 export default function PracticeSessionScreen() {
   const { currentTier } = useSubscription();
   const { unitId } = useLocalSearchParams<{ unitId?: string }>();
+  const { theme } = useAppTheme();
+  const isFreeContent = canOpenUnit(currentTier, unitId);
+  const quota = useFreeDailyQuestionQuota(!isFreeContent);
 
-  if (!canOpenUnit(currentTier, unitId)) {
+  if (isFreeContent) {
+    return <PracticeSessionContent />;
+  }
+
+  if (!quota.ready) {
+    return (
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.bg }}>
+        <ActivityIndicator color={theme.accent} />
+      </View>
+    );
+  }
+
+  if (quota.remaining <= 0) {
     return <PremiumAccessScreen feature="grade12Path" />;
   }
 
-  return <PracticeSessionContent />;
+  return (
+    <PracticeSessionContent maxFreeQuestions={quota.remaining} onConsumeFreeQuestions={quota.consume} />
+  );
 }
 
-function PracticeSessionContent() {
+function PracticeSessionContent({
+  maxFreeQuestions,
+  onConsumeFreeQuestions,
+}: {
+  maxFreeQuestions?: number;
+  onConsumeFreeQuestions?: (n: number) => void;
+}) {
   const router = useRouter();
   const { unitId } = useLocalSearchParams<{ unitId?: string }>();
   const { theme } = useAppTheme();
@@ -113,8 +182,21 @@ function PracticeSessionContent() {
     const pool = buildPool(unitId);
     const fallback = buildPool();
     const selectedPool = pool.length ? pool : fallback;
-    return shuffleSeeded(selectedPool, sessionSeed).slice(0, 6);
-  }, [sessionSeed, unitId]);
+    const cap = typeof maxFreeQuestions === 'number' ? Math.max(0, Math.min(6, maxFreeQuestions)) : 6;
+    return shuffleSeeded(selectedPool, sessionSeed).slice(0, cap);
+  }, [sessionSeed, unitId, maxFreeQuestions]);
+
+  const hasConsumedFreeRef = useRef(false);
+  useEffect(() => {
+    if (
+      !hasConsumedFreeRef.current &&
+      typeof maxFreeQuestions === 'number' &&
+      questions.length > 0
+    ) {
+      hasConsumedFreeRef.current = true;
+      onConsumeFreeQuestions?.(questions.length);
+    }
+  }, [maxFreeQuestions, onConsumeFreeQuestions, questions.length]);
 
   const [currentIndex, setCurrentIndex] = useState(0);
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
