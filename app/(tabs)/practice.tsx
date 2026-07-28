@@ -68,12 +68,8 @@ function MenuRow({
 }
 
 export default function PracticeScreen() {
-  const { currentTier } = useSubscription();
-
-  if (!canAccessFeature(currentTier, 'grade12Path')) {
-    return <PremiumAccessScreen feature="grade12Path" />;
-  }
-
+  // Free users can browse the practice hub; premium is enforced per session
+  // (Unit 1 practice is free, other units use the daily quota or paywall).
   return <PracticeContent />;
 }
 

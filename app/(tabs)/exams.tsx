@@ -140,12 +140,7 @@ const ec = StyleSheet.create({
 });
 
 export default function ExamsScreen() {
-  const { currentTier } = useSubscription();
-
-  if (!canAccessFeature(currentTier, 'grade12Path')) {
-    return <PremiumAccessScreen feature="grade12Path" />;
-  }
-
+  // Free users can browse the exam list; premium is enforced when an exam opens.
   return <ExamsContent />;
 }
 

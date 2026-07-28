@@ -507,6 +507,29 @@ function PracticeSessionContent({
       </View>
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+        {typeof maxFreeQuestions === 'number' ? (
+          <TouchableOpacity
+            onPress={() => router.push('/subscription')}
+            activeOpacity={0.9}
+            style={{
+              flexDirection: isAr ? 'row-reverse' : 'row',
+              alignItems: 'center',
+              gap: 8,
+              marginBottom: 14,
+              paddingVertical: 10,
+              paddingHorizontal: 14,
+              borderRadius: 14,
+              borderWidth: 1,
+              backgroundColor: withAlpha(theme.accent, 0.1),
+              borderColor: withAlpha(theme.accent, 0.28),
+            }}>
+            <Ionicons name="sparkles-outline" size={16} color={theme.accent} />
+            <Text style={{ flex: 1, color: theme.text, fontSize: 13, textAlign: isAr ? 'right' : 'left' }}>
+              {isAr ? 'تدريب يومي مجاني · قم بالترقية للوصول غير المحدود' : 'Free daily practice · Upgrade for unlimited access'}
+            </Text>
+            <Ionicons name={isAr ? 'chevron-back' : 'chevron-forward'} size={16} color={theme.accent} />
+          </TouchableOpacity>
+        ) : null}
         <View style={[styles.metaRow, isAr && styles.metaRowRtl]}>
           <View style={[styles.metaPill, isAr && styles.metaPillRtl, { backgroundColor: theme.surface, borderColor: theme.border }]}>
             <Ionicons name="layers-outline" size={14} color={theme.accent} />
