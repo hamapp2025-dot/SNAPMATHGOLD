@@ -3,7 +3,18 @@ import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'rea
 import { Ionicons } from '@expo/vector-icons';
 import { Asset } from 'expo-asset';
 import { useNavigation, useRouter } from 'expo-router';
-import Pdf from 'react-native-pdf';
+import { WebView } from 'react-native-webview';
+
+// react-native-pdf is a native module: present in dev/TestFlight builds,
+// absent in Expo Go. Guarded require keeps Expo Go from crashing at startup;
+// the WebView fallback below renders the PDF there instead.
+let Pdf: any = null;
+try {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  Pdf = require('react-native-pdf').default;
+} catch {
+  Pdf = null;
+}
 
 import { useAppTheme } from '../src/theme/ThemeContext';
 import { useT } from '../src/config/LanguageContext';
@@ -206,20 +217,39 @@ export default function TextbookScreen() {
           </View>
         ) : (
           <View style={s.pdfLayer}>
-            <Pdf
-              key={activeWorkbook.id}
-              source={{ uri: pdfUri, cache: true }}
-              trustAllCerts={false}
-              onLoadComplete={() => {
-                setIsPdfLoading(false);
-                setLoadFailed(false);
-              }}
-              onError={() => {
-                setIsPdfLoading(false);
-                setLoadFailed(true);
-              }}
-              style={s.pdf}
-            />
+            {Pdf ? (
+              <Pdf
+                key={activeWorkbook.id}
+                source={{ uri: pdfUri, cache: true }}
+                trustAllCerts={false}
+                onLoadComplete={() => {
+                  setIsPdfLoading(false);
+                  setLoadFailed(false);
+                }}
+                onError={() => {
+                  setIsPdfLoading(false);
+                  setLoadFailed(true);
+                }}
+                style={s.pdf}
+              />
+            ) : (
+              <WebView
+                key={activeWorkbook.id}
+                source={{ uri: pdfUri }}
+                originWhitelist={['*']}
+                allowFileAccess
+                allowFileAccessFromFileURLs
+                onLoadEnd={() => {
+                  setIsPdfLoading(false);
+                  setLoadFailed(false);
+                }}
+                onError={() => {
+                  setIsPdfLoading(false);
+                  setLoadFailed(true);
+                }}
+                style={s.pdf}
+              />
+            )}
             {isPdfLoading ? (
               <View style={[s.pdfLoadingOverlay, { backgroundColor: withAlpha(theme.bg, 0.82) }]}>
                 <ActivityIndicator color={theme.accent} />

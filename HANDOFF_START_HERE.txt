@@ -1,0 +1,26 @@
+SnapMath Gold — Handoff Package
+================================
+
+Start here: docs/SNAPMATH_GOLD_HANDOFF.md
+
+Quick setup (new developer):
+  npm install
+  cp .env.example .env    # fill Firebase / Supabase / RevenueCat as needed
+  npm run simulator       # iOS simulator + Metro
+
+Key links:
+  Landing (live): https://snapmath-academy-landing.onrender.com
+  TestFlight admin: https://appstoreconnect.apple.com/apps/6760658506/testflight/ios
+  Latest iOS build: 1.0.0 (60)
+
+Curriculum:
+  docs/CURRICULUM_LESSON_TEMPLATE.md
+  docs/JOB_POST_HEAD_OF_CURRICULUM.md
+  src/data/grade12.ts
+
+Release:
+  npm run release:ios -- --no-wait
+  npm run release:status
+
+Note: node_modules, .env, and .ipa files are excluded from this zip.
+Run npm install in repo root and landing-page/ after unzip.

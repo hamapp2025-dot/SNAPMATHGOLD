@@ -1,248 +1,182 @@
-from manim import DOWN, FadeIn, FadeOut, Indicate, RIGHT, TransformMatchingTex, UP, VGroup, Write
+from __future__ import annotations
 
-from snapmath_manim.base_scene import SnapMathLessonScene
-from snapmath_manim.theme import (
-  SNAP_BG,
-  SNAP_GOLD,
-  SNAP_MUTED,
-  SNAP_SUCCESS,
-  make_ar_text,
-  make_ar_title_text,
-  make_label_chip,
-  make_math,
+from manim import (
+  DOWN,
+  UP,
+  Axes,
+  Create,
+  Dot,
+  FadeIn,
+  FadeOut,
+  Flash,
+  MathTex,
+  TransformMatchingTex,
+  VGroup,
+  Write,
+)
+
+from snapmath_manim.threeblue import (
+  C_COS,
+  C_GREEN,
+  C_ONE,
+  C_SIN,
+  C_TAN,
+  Base3B1BScene,
 )
 
 
-class RemainderFactorTheoremsScene(SnapMathLessonScene):
+class RemainderFactorTheoremsScene(Base3B1BScene):
   lesson_id = 'u1-l1'
-  title_en = 'Remainder & Factor Theorems'
-  title_ar = 'نظريتا الباقي والعامل'
-  unit_en = 'Unit 1 - Functions & Algebraic Expressions'
-  unit_ar = 'الوحدة 1 - الدوال والتعابير الجبرية'
-  eyebrow_en = 'Remainder core'
-  eyebrow_ar = 'نظرية الباقي'
-  show_english_title = False
-  show_english_footer = False
-  body_copy_max_width = 3.6
-
-  def build_header(self) -> VGroup:
-    lesson_chip = make_label_chip(
-      self.lesson_id.upper(),
-      chip_color=SNAP_GOLD,
-      text_color=SNAP_BG,
-      font_size=16,
-    )
-    title = self.fit_to_width(make_ar_title_text(self.title_ar, font_size=24), self.header_max_width)
-    stack = VGroup(lesson_chip, title).arrange(DOWN, buff=0.1)
-    stack.to_edge(UP, buff=0.22)
-    return stack
-
-  def make_section_header(self, ar_label: str, *, is_core: bool = False):
-    return make_ar_title_text(
-      ar_label,
-      font_size=18,
-      color=SNAP_GOLD if is_core else SNAP_SUCCESS,
-    )
-
-  def make_copy(self, ar_text: str, y: float, *, font_size: int = 20, color=SNAP_MUTED):
-    copy = self.fit_to_width(
-      make_ar_text(ar_text, font_size=font_size, color=color),
-      self.body_copy_max_width,
-    )
-    copy.move_to(DOWN * y)
-    return copy
-
-  def make_tag(self, label: str, y: float, *, color=SNAP_GOLD, font_size: int = 20):
-    tag = make_ar_text(label, font_size=font_size, color=color)
-    tag.move_to(DOWN * y)
-    return tag
 
   def construct(self):
-    stage = self.build_stage()
-    stage.shift(DOWN * 0.18)
-    header = self.build_header()
+    self.s_division()
+    self.s_remainder()
+    self.s_factor()
+    self.s_graph()
+    self.s_example()
+    self.s_recap()
+    self.flush()
 
-    self.add(stage)
-    self.reveal_scaffold(header)
+  # ---- S1: the division statement ----
+  def s_division(self):
+    self.section_label('القسمة على (x − a)')
+    div = MathTex(r'P(x)', r'=', r'(x-a)', r'\,Q(x)', r'+', r'R', font_size=48)
+    div.set_color_by_tex('(x-a)', C_COS)
+    div.set_color_by_tex('R', C_TAN)
+    self.fit(div, 4.0).move_to(UP * 0.5)
 
-    overview_header = self.make_section_header('الباقي مباشرة', is_core=True)
-    overview_header.next_to(header, DOWN, buff=0.2)
-    division_rule = make_math(r'P(x) = (x-a)Q(x) + R', font_size=30).move_to(UP * 0.6)
-    division_rule.set_color_by_tex('R', SNAP_GOLD)
-    remainder_focus = make_math(r'R', font_size=54, color=SNAP_GOLD).move_to(DOWN * 0.1)
-    remainder_label = self.make_tag('الباقي', 0.72, color=SNAP_GOLD, font_size=28)
-    shortcut = make_math(r'P(a) = R', font_size=46, color=SNAP_GOLD).move_to(DOWN * 1.45)
-    shortcut_tag = self.make_tag('عوّض أولاً', 2.08, color=SNAP_SUCCESS, font_size=25)
-    overview_group = VGroup(
-      overview_header,
-      division_rule,
-      remainder_focus,
-      remainder_label,
-      shortcut,
-      shortcut_tag,
-    )
+    self.cap('أي كثير حدود مقسوم على (x − a) يترك خارجاً وباقياً.')
+    self.play(Write(div), run_time=1.4)
+    self.play(Flash(div.get_part_by_tex('R'), color=C_TAN, line_length=0.15, num_lines=12, flash_radius=0.7))
+    self.cap('الباقي R هو ما يهمنا.')
+    self._div = div
 
-    self.play(FadeIn(overview_header, shift=DOWN * 0.08))
-    self.play(Write(division_rule))
-    self.play(FadeIn(remainder_focus, shift=DOWN * 0.05), FadeIn(remainder_label, shift=DOWN * 0.05))
-    self.play(Write(shortcut))
-    self.play(FadeIn(shortcut_tag, shift=DOWN * 0.05))
-    self.play(Indicate(shortcut, color=SNAP_GOLD), Indicate(remainder_focus, color=SNAP_GOLD))
-    self.wait(18)
+  # ---- S2: remainder theorem ----
+  def s_remainder(self):
+    self.section_label('نظرية الباقي')
+    self.play(self._div.animate.scale_to_fit_width(3.4).move_to(UP * 2.1))
 
-    derivation_header = self.make_section_header('لماذا P(a)', is_core=True)
-    derivation_header.next_to(header, DOWN, buff=0.2)
-    step1 = make_math(r'P(x) = (x-a)Q(x) + R', font_size=28).move_to(UP * 0.55)
-    step1.set_color_by_tex('R', SNAP_GOLD)
-    step2 = make_math(r'P(a) = (a-a)Q(a) + R', font_size=28).move_to(DOWN * 0.05)
-    step2.set_color_by_tex('(a-a)', SNAP_GOLD)
-    step2.set_color_by_tex('R', SNAP_SUCCESS)
-    step3 = make_math(r'P(a) = 0 \cdot Q(a) + R', font_size=28).move_to(DOWN * 0.75)
-    step3.set_color_by_tex('0', SNAP_GOLD)
-    step3.set_color_by_tex('R', SNAP_SUCCESS)
-    step4 = make_math(r'P(a) = R', font_size=44, color=SNAP_GOLD).move_to(DOWN * 1.55)
-    zero_tag = self.make_tag('يصير صفراً', 1.42, color=SNAP_GOLD, font_size=24)
-    remain_tag = self.make_tag('يبقى R', 2.18, color=SNAP_SUCCESS, font_size=24)
-    derivation_group = VGroup(derivation_header, step1, step2, step3, step4, zero_tag, remain_tag)
+    s2 = MathTex(r'P(a)', r'=', r'(a-a)', r'\,Q(a)', r'+', r'R', font_size=44)
+    s2.set_color_by_tex('(a-a)', C_COS)
+    s2.set_color_by_tex('R', C_TAN)
+    self.fit(s2, 4.0).move_to(UP * 0.9)
 
-    self.play(FadeOut(overview_group, shift=DOWN * 0.08))
-    self.play(FadeIn(derivation_header, shift=DOWN * 0.08), Write(step1))
-    self.wait(8)
-    self.play(TransformMatchingTex(step1.copy(), step2))
-    self.wait(8)
-    self.play(TransformMatchingTex(step2.copy(), step3))
-    self.play(FadeIn(zero_tag, shift=DOWN * 0.05))
-    self.play(TransformMatchingTex(step3.copy(), step4), FadeOut(zero_tag, shift=DOWN * 0.05))
-    self.play(FadeIn(remain_tag, shift=DOWN * 0.05))
-    self.play(Indicate(step4, color=SNAP_GOLD))
-    self.wait(10)
+    s3 = MathTex(r'P(a)', r'=', r'0\cdot Q(a)', r'+', r'R', font_size=44)
+    s3.set_color_by_tex('0\\cdot Q(a)', C_COS)
+    s3.set_color_by_tex('R', C_TAN)
+    self.fit(s3, 4.0).move_to(DOWN * 0.1)
 
-    factor_header = self.make_section_header('نظرية العامل', is_core=True)
-    factor_header.next_to(header, DOWN, buff=0.2)
-    factor_step1 = make_math(r'P(a)=0 \Rightarrow R=0', font_size=32).move_to(UP * 0.6)
-    factor_step1.set_color_by_tex('0', SNAP_GOLD)
-    factor_step1.set_color_by_tex('R', SNAP_SUCCESS)
-    factor_step2 = make_math(r'R=0 \Rightarrow P(x) = (x-a)Q(x)', font_size=28).move_to(DOWN * 0.15)
-    factor_step2.set_color_by_tex('R', SNAP_GOLD)
-    factor_factor = make_math(r'(x-a)', font_size=34, color=SNAP_SUCCESS)
-    factor_badge = make_ar_text('عامل', font_size=24, color=SNAP_SUCCESS)
-    factor_step3 = VGroup(factor_factor, factor_badge).arrange(DOWN, buff=0.16).move_to(DOWN * 1.18)
-    factor_group = VGroup(factor_header, factor_step1, factor_step2, factor_step3)
+    s4 = MathTex(r'P(a)', r'=', r'R', font_size=64)
+    s4.set_color_by_tex('R', C_GREEN)
+    s4.move_to(DOWN * 1.4)
 
-    self.play(FadeOut(derivation_group, shift=DOWN * 0.08))
-    self.play(FadeIn(factor_header, shift=DOWN * 0.08))
-    self.play(Write(factor_step1))
-    self.wait(8)
-    self.play(Write(factor_step2))
-    self.wait(8)
-    self.play(FadeIn(factor_step3, shift=DOWN * 0.05))
-    self.play(Indicate(factor_step3, color=SNAP_SUCCESS))
-    self.wait(16)
+    self.cap('عوّض x = a في الطرفين.')
+    self.play(TransformMatchingTex(self._div.copy(), s2), run_time=1.3)
+    self.cap('فيصبح (a − a) صفراً، ويختفي حد الخارج.')
+    self.play(TransformMatchingTex(s2.copy(), s3), run_time=1.2)
+    self.play(Write(s4), run_time=0.9)
+    self.play(Flash(s4, color=C_GREEN, line_length=0.18, num_lines=16, flash_radius=1.1))
+    self.cap('فالباقي هو ببساطة قيمة كثير الحدود عند a.')
+    self._rem = VGroup(s2, s3, s4)
 
-    example_header = self.make_section_header('مثال أردني محلول')
-    example_header.next_to(header, DOWN, buff=0.2)
-    example_prompt_factor = make_math(r'(x+2)', font_size=34, color=SNAP_GOLD)
-    example_prompt_badge = make_label_chip('عامل؟', is_ar=True, chip_color=SNAP_GOLD, text_color=SNAP_BG, font_size=18)
-    example_prompt = VGroup(example_prompt_factor, example_prompt_badge).arrange(DOWN, buff=0.14)
-    example_prompt.next_to(example_header, DOWN, buff=0.28)
-    example_poly = make_math(r'P(x)=x^3+2x^2-x-2', font_size=26).move_to(UP * 0.45)
-    example_eval1 = make_math(r'P(-2)=(-2)^3+2(-2)^2-(-2)-2', font_size=22).move_to(DOWN * 0.35)
-    example_eval2 = make_math(r'P(-2)=-8+8+2-2', font_size=26).move_to(DOWN * 0.95)
-    example_eval3 = make_math(r'P(-2)=0', font_size=38, color=SNAP_SUCCESS).move_to(DOWN * 1.55)
-    example_factor = make_math(r'(x+2)', font_size=34, color=SNAP_GOLD)
-    example_badge = make_ar_text('عامل', font_size=24, color=SNAP_GOLD)
-    example_result = VGroup(example_factor, example_badge).arrange(DOWN, buff=0.16).move_to(DOWN * 2.05)
-    example_group = VGroup(
-      example_header,
-      example_prompt,
-      example_poly,
-      example_eval1,
-      example_eval2,
-      example_eval3,
-      example_result,
-    )
+  # ---- S3: factor theorem ----
+  def s_factor(self):
+    self.clear_body(self._rem)
+    self.play(self._div.animate.scale_to_fit_width(3.0).move_to(UP * 2.2))
+    self.section_label('نظرية العامل')
 
-    self.play(FadeOut(factor_group, shift=DOWN * 0.08))
-    self.play(FadeIn(example_header, shift=DOWN * 0.08))
-    self.play(Write(example_poly))
-    self.play(FadeIn(example_prompt, shift=DOWN * 0.05))
-    self.wait(8)
-    self.play(Write(example_eval1))
-    self.wait(10)
-    self.play(Write(example_eval2))
-    self.wait(10)
-    self.play(Write(example_eval3))
-    self.play(Indicate(example_eval3, color=SNAP_SUCCESS))
-    self.wait(10)
-    self.play(FadeIn(example_result, shift=DOWN * 0.05))
-    self.wait(12)
+    f1 = MathTex(r'P(a)=0', r'\;\Rightarrow\;', r'R=0', font_size=46)
+    f1.set_color_by_tex('R=0', C_TAN)
+    self.fit(f1, 4.0).move_to(UP * 0.7)
+    f2 = MathTex(r'P(x)=(x-a)\,Q(x)', font_size=42)
+    f2.set_color(C_COS)
+    self.fit(f2, 4.0).move_to(DOWN * 0.4)
+    f3 = MathTex(r'(x-a)', font_size=52, color=C_GREEN)
+    from snapmath_manim.threeblue import ar
+    badge = ar('عامل', size=30, color=C_GREEN)
+    grp = VGroup(f3, badge).arrange(DOWN, buff=0.2).move_to(DOWN * 1.6)
 
-    check_header = self.make_section_header('تحقق سريع')
-    check_header.next_to(header, DOWN, buff=0.2)
-    check1_prompt = self.make_copy(
-      'ما قيمة P(2) إذا كانت P(x)=x^2-3x+2؟',
-      0.1,
-    )
-    check1_math = make_math(r'P(2)=2^2-3(2)+2=0', font_size=32, color=SNAP_SUCCESS).move_to(DOWN * 0.85)
-    check1_answer = self.make_copy(
-      'الإجابة الصحيحة: 0',
-      1.75,
-    )
-    check1_group = VGroup(check_header, check1_prompt, check1_math, check1_answer)
+    self.cap('إذا كان P(a) = 0 فالباقي صفر.')
+    self.play(Write(f1), run_time=1.1)
+    self.cap('فلا يبقى إلا حاصل الضرب في (x − a).')
+    self.play(Write(f2), run_time=1.1)
+    self.play(FadeIn(grp, shift=UP * 0.1))
+    self.play(Flash(f3, color=C_GREEN, line_length=0.16, num_lines=14, flash_radius=1.0))
+    self.cap('أي أن (x − a) عامل لكثير الحدود.')
+    self._fac = VGroup(f1, f2, grp)
 
-    check2_prompt = self.make_copy(
-      'إذا كانت P(a)=0 فإن (x-a) هو عامل وليس باقياً.',
-      0.1,
-    )
-    check2_math = self.make_copy(
-      'إذا كانت P(a)=0 فهذا يعني أن (x-a) عامل.',
-      0.85,
-      font_size=22,
-      color=SNAP_SUCCESS,
-    )
-    check2_answer = self.make_copy(
-      'هذه هي أسرع خطوة لحل أسئلة العامل في الامتحان.',
-      1.75,
-    )
-    check2_group = VGroup(check_header, check2_prompt, check2_math, check2_answer)
+  # ---- S4: roots are factors (graph) ----
+  def s_graph(self):
+    self.clear_body(self._fac, self._div)
+    self.section_label('الجذر يعني عاملاً')
 
-    self.play(FadeOut(example_group, shift=DOWN * 0.08))
-    self.play(FadeIn(check_header, shift=DOWN * 0.08))
-    self.play(FadeIn(check1_prompt, shift=DOWN * 0.05), Write(check1_math))
-    self.play(FadeIn(check1_answer, shift=DOWN * 0.05))
-    self.wait(18)
-    self.play(FadeOut(VGroup(check1_prompt, check1_math, check1_answer), shift=DOWN * 0.05))
-    self.play(FadeIn(check2_prompt, shift=DOWN * 0.05), Write(check2_math))
-    self.play(FadeIn(check2_answer, shift=DOWN * 0.05))
-    self.wait(18)
+    axes = Axes(
+      x_range=[-3, 2, 1], y_range=[-3, 3, 1],
+      x_length=4.1, y_length=3.6,
+      axis_config={'stroke_color': '#48557f', 'stroke_width': 2, 'include_ticks': True, 'tip_length': 0.16},
+    ).move_to(UP * 0.55)
 
-    recap_header = self.make_section_header('الخلاصة الامتحانية')
-    recap_header.next_to(header, DOWN, buff=0.2)
-    recap_step1 = self.make_copy(
-      '1. عوّض أولاً',
-      0.45,
-    )
-    recap_step2 = self.make_copy(
-      '2. اقرأ P(a)',
-      1.1,
-    )
-    recap_step3 = self.make_copy(
-      '3. الصفر يعني عامل',
-      1.75,
-    )
-    recap_rule = make_math(r'P(a)=0', font_size=40, color=SNAP_GOLD)
-    recap_meaning = make_ar_text('يعني', font_size=22, color=SNAP_MUTED)
-    recap_factor = make_math(r'(x-a)', font_size=34, color=SNAP_GOLD)
-    recap_badge = make_ar_text('عامل', font_size=24, color=SNAP_GOLD)
-    recap_result = VGroup(recap_factor, recap_badge).arrange(DOWN, buff=0.1)
-    recap_formula = VGroup(recap_rule, recap_meaning, recap_result).arrange(DOWN, buff=0.16).move_to(DOWN * 2.35)
-    recap_group = VGroup(recap_header, recap_step1, recap_step2, recap_step3, recap_formula)
+    def f(x):
+      return 0.6 * (x ** 3 + 2 * x ** 2 - x - 2)
 
-    self.play(FadeOut(VGroup(check_header, check2_prompt, check2_math, check2_answer), shift=DOWN * 0.08))
-    self.play(FadeIn(recap_header, shift=DOWN * 0.08))
-    self.play(FadeIn(recap_step1, shift=DOWN * 0.05))
-    self.play(FadeIn(recap_step2, shift=DOWN * 0.05))
-    self.play(FadeIn(recap_step3, shift=DOWN * 0.05))
-    self.play(FadeIn(recap_formula, shift=DOWN * 0.05))
-    self.play(Indicate(recap_result, color=SNAP_GOLD))
-    self.wait(30)
+    curve = axes.plot(f, x_range=[-2.9, 1.35], color=C_SIN, stroke_width=4)
+    roots = [-2, -1, 1]
+    dots = VGroup(*[Dot(axes.c2p(rx, 0), color=C_GREEN, radius=0.08) for rx in roots])
+    poly = MathTex(r'P(x)=x^3+2x^2-x-2', font_size=30).next_to(axes, DOWN, buff=0.5)
+    self.fit(poly, 4.1)
+    hi = Dot(axes.c2p(-2, 0), color=C_TAN, radius=0.12)
+    hlabel = MathTex(r'x=-2', font_size=30, color=C_TAN).next_to(hi, UP, buff=0.15)
+
+    self.cap('انظر إلى منحنى كثير الحدود.')
+    self.play(Create(axes), run_time=1.0)
+    self.play(Create(curve), run_time=1.6)
+    self.play(Write(poly))
+    self.cap('حيث يقطع المحور الأفقي، هناك جذر.')
+    self.play(FadeIn(dots, lag_ratio=0.3))
+    self.play(FadeIn(hi), Write(hlabel), Flash(hi, color=C_TAN, line_length=0.14, num_lines=12, flash_radius=0.6))
+    self.cap('وكل جذر a يقابله عامل (x − a).')
+    self._graph = VGroup(axes, curve, dots, poly, hi, hlabel)
+
+  # ---- S5: worked example ----
+  def s_example(self):
+    self.clear_body(self._graph)
+    self.section_label('مثال محلول')
+    q = MathTex(r'(x+2)\ ?', font_size=40, color=C_COS).move_to(UP * 2.1)
+    e1 = MathTex(r'P(-2)=(-2)^3+2(-2)^2-(-2)-2', font_size=30)
+    e2 = MathTex(r'=-8+8+2-2', font_size=34)
+    e3 = MathTex(r'=0', font_size=52, color=C_GREEN)
+    stack = VGroup(self.fit(e1, 4.1), e2, e3).arrange(DOWN, buff=0.5).move_to(DOWN * 0.1)
+    from snapmath_manim.threeblue import ar
+    concl = VGroup(
+      MathTex(r'(x+2)', font_size=44, color=C_GREEN),
+      ar('عامل', size=28, color=C_GREEN),
+    ).arrange(DOWN, buff=0.16).move_to(DOWN * 2.5)
+
+    self.cap('هل (x + 2) عامل لـ P(x)؟')
+    self.play(FadeIn(q, shift=DOWN * 0.1))
+    self.cap('عوّض x = −2 مباشرة.')
+    self.play(Write(e1), run_time=1.3)
+    self.play(Write(e2), run_time=1.0)
+    self.play(Write(e3), run_time=0.7)
+    self.play(Flash(e3, color=C_GREEN, line_length=0.16, num_lines=14, flash_radius=0.9))
+    self.cap('النتيجة صفر، إذن (x + 2) عامل.')
+    self.play(FadeIn(concl, shift=UP * 0.1))
+    self._ex = VGroup(q, stack, concl)
+
+  # ---- S6: recap ----
+  def s_recap(self):
+    self.clear_body(self._ex)
+    self.section_label('الخلاصة')
+    r1 = MathTex(r'P(a)=R', font_size=52)
+    r1.set_color_by_tex('R', C_TAN)
+    r2 = MathTex(r'P(a)=0', r'\iff', r'(x-a)\mid P(x)', font_size=40)
+    r2.set_color(C_GREEN)
+    stack = VGroup(self.fit(r1, 4.0), self.fit(r2, 4.1)).arrange(DOWN, buff=0.8).move_to(UP * 0.2)
+
+    self.cap('عوّض أولاً: قيمة P عند a هي الباقي.')
+    self.play(Write(r1), run_time=1.0)
+    self.cap('وإذا كان الباقي صفراً، فلديك عامل.')
+    self.play(Write(r2), run_time=1.1)
+    self.play(stack.animate.scale(1.06), run_time=0.4)
+    self.play(stack.animate.scale(1 / 1.06), run_time=0.35)
+    self.wait(0.8)
